@@ -1,7 +1,21 @@
 # E2E Tests (Playwright)
 
-Initialize Playwright tests in this folder once frontend and backend are running.
+This folder includes the required MVP main-path UI test:
 
-Suggested command:
+- `specs/mvp-main-path.spec.ts`
 
-npm init playwright@latest
+## Run
+
+1. Install dependencies:
+
+	npm install
+
+2. List tests:
+
+	npm run test:list
+
+3. Run tests:
+
+	npm test
+
+The Playwright config starts backend and frontend web servers automatically.
