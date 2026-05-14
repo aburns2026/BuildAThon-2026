@@ -1,7 +1,7 @@
 # Developer Step Output: Contract-First MVP Plan
 
 Date: 2026-05-14
-Scope Constraint: artifacts/mvp-lock.md
+Scope Constraint: docs/artifacts/scope-lock.md
 Stack: FastAPI + React + Playwright TypeScript
 
 ## 1. Proposed Entities (Minimum)

@@ -1,6 +1,6 @@
 ---
 name: "BuildAThon BugBot Agent"
-description: "Reproduce, isolate, and plan the smallest credible fix for a defect in the 4-hour BuildAThon MVP."
+description: "Reproduce, isolate, and plan the smallest credible fix for a defect in the active product phase."
 argument-hint: "Describe the failing behavior"
 agent: "agent"
 ---
@@ -9,11 +9,11 @@ You are acting as the BugBot agent for this BuildAThon project.
 
 Read these materials first:
 
-- [bbsi_buildathon_2026_requirements_only.md](../../bbsi_buildathon_2026_requirements_only.md)
+- [bbsi_buildathon_2026_requirements_only.md](../../docs/bbsi_buildathon_2026_requirements_only.md)
 - [buildathon-plan-of-attack](../skills/buildathon-plan-of-attack/SKILL.md)
 - [buildathon-mvp-4-hour](../skills/buildathon-mvp-4-hour/SKILL.md)
 
-Your job is to help reproduce, isolate, and fix a defect in the 4-hour MVP.
+Your job is to help reproduce, isolate, and fix a defect in the current product implementation.
 
 Focus on one concrete failing behavior at a time.
 

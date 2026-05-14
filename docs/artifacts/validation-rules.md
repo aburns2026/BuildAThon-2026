@@ -16,3 +16,10 @@
 ## Response Rules
 - Validation failures return structured error payloads.
 - Success payloads include enough fields for UI state updates without extra calls where practical.
+
+## Expansion Rules (Phase A)
+- Missing-punch threshold must be a positive integer in minutes.
+- Only OPEN shifts are eligible for missing-punch detection.
+- Elapsed time for missing-punch detection is computed in UTC.
+- Missing-punch exceptions endpoint must return deterministic empty lists when no exceptions exist.
+- UI must tolerate exceptions-endpoint failures and show a safe fallback message.

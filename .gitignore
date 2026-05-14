@@ -26,3 +26,13 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Generated local artifacts
+.coverage
+code/.coverage
+code/pytest_output.txt
+artifacts/playwright-runs/
+code/code/
+code/tests/api/coverage.xml
+link-check-results.txt
+**/buildathon.db

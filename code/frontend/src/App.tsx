@@ -25,8 +25,18 @@ type PayrollSummary = {
   period_end: string | null;
 };
 
+type MissingPunchException = {
+  employee_id: string;
+  shift_id: string;
+  start_at: string;
+  elapsed_minutes: number;
+  status: "MISSING_PUNCH";
+};
+
 const API_BASE =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://127.0.0.1:8000";
+const API_BEARER_TOKEN =
+  (import.meta.env.VITE_DEMO_AUTH_TOKEN as string | undefined) ?? "demo-employee-token";
 
 const DEMO_EMPLOYEE_ID = "E001";
 
@@ -47,6 +57,7 @@ export default function App() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
+  const [exceptions, setExceptions] = useState<MissingPunchException[]>([]);
   const [busy, setBusy] = useState(false);
 
   const headerSub = useMemo(
@@ -63,16 +74,18 @@ export default function App() {
     return fetch(`${API_BASE}${path}`, {
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${API_BEARER_TOKEN}`,
       },
       ...init,
     });
   }
 
   async function refreshReadModels() {
-    const [shiftRes, auditRes, summaryRes] = await Promise.all([
+    const [shiftRes, auditRes, summaryRes, exceptionRes] = await Promise.all([
       apiRequest(`/employees/${DEMO_EMPLOYEE_ID}/shifts`),
       apiRequest(`/employees/${DEMO_EMPLOYEE_ID}/audit-events`),
       apiRequest(`/employees/${DEMO_EMPLOYEE_ID}/payroll-summary`),
+      apiRequest(`/employees/${DEMO_EMPLOYEE_ID}/missing-punch-exceptions?threshold_minutes=60`),
     ]);
 
     if (shiftRes.ok) {
@@ -88,6 +101,11 @@ export default function App() {
     if (summaryRes.ok) {
       const summaryBody = await summaryRes.json();
       setSummary(summaryBody);
+    }
+
+    if (exceptionRes.ok) {
+      const exceptionBody = await exceptionRes.json();
+      setExceptions(exceptionBody.exceptions ?? []);
     }
   }
 
@@ -136,23 +154,38 @@ export default function App() {
   }, [shifts]);
 
   return (
-    <main className="page">
-      <section className="hero">
+    <main id="main-content" className="page" aria-labelledby="app-title">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+
+      <section className="hero" aria-label="Application heading">
         <p className="eyebrow">BuildAThon 2026 MVP</p>
-        <h1>Workforce Time Capture Console</h1>
+        <h1 id="app-title">Workforce Time Capture Console</h1>
         <p className="sub">Employee {DEMO_EMPLOYEE_ID} · {headerSub}</p>
       </section>
 
-      <section className="controls card">
+      <section className="controls card" aria-label="Punch controls">
         <div className="button-row">
-          <button disabled={busy} onClick={() => void runPunch("in")}>
+          <button
+            type="button"
+            disabled={busy}
+            aria-label={`Clock in employee ${DEMO_EMPLOYEE_ID}`}
+            onClick={() => void runPunch("in")}
+          >
             Clock In
           </button>
-          <button className="secondary" disabled={busy} onClick={() => void runPunch("out")}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy}
+            aria-label={`Clock out employee ${DEMO_EMPLOYEE_ID}`}
+            onClick={() => void runPunch("out")}
+          >
             Clock Out
           </button>
         </div>
-        <p className="message">{message}</p>
+        <p className="message" role="status" aria-live="polite">
+          {message}
+        </p>
       </section>
 
       <section className="grid">
@@ -217,6 +250,25 @@ export default function App() {
                   <span>{event.details}</span>
                 </li>
               ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card">
+        <h2>Missing Punch Exceptions</h2>
+        {exceptions.length === 0 ? (
+          <p className="empty">No missing punch exceptions.</p>
+        ) : (
+          <ul className="list">
+            {exceptions.map((exception) => (
+              <li key={exception.shift_id}>
+                <div>
+                  <strong>{exception.status}</strong>
+                  <span>Shift {exception.shift_id}</span>
+                </div>
+                <span>{exception.elapsed_minutes} min open</span>
+              </li>
+            ))}
           </ul>
         )}
       </section>

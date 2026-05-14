@@ -1,7 +1,7 @@
 # QA/STE Step Output: Minimum MVP Test Plan
 
 Date: 2026-05-14
-Scope Constraint: artifacts/mvp-lock.md
+Scope Constraint: docs/artifacts/scope-lock.md
 Stack: FastAPI API + React UI + Playwright TypeScript
 
 ## 1. MVP Test Plan
@@ -102,3 +102,36 @@ After API tests are green, add UI-E2E-1 in code/tests/e2e and run headless once 
   - PYTHONPATH=$PWD/code python3 -m pytest code/tests/api -q
 - Playwright tests (once configured):
   - npx playwright test --reporter=line
+
+## 7. Post-MVP Expansion QA Addendum (Agent 4)
+
+Expanded scope validated in this step:
+- leave request creation, approval, and balance contracts
+- time correction request/list contracts
+- scheduled shift create/list contracts
+- payroll breakdown and compliance report contracts
+- enterprise company employee listing and ops diagnostics contracts
+
+Expanded API tests:
+- file: code/tests/api/test_expansion_contracts.py
+- validated endpoints:
+  - POST/GET /employees/{employeeId}/time-corrections
+  - POST/GET /employees/{employeeId}/leave-requests
+  - POST /leave-requests/{leaveRequestId}/approve
+  - GET /employees/{employeeId}/leave-balance
+  - POST/GET /employees/{employeeId}/scheduled-shifts
+  - GET /employees/{employeeId}/payroll-breakdown
+  - GET /employees/{employeeId}/compliance-report
+  - GET /companies/{companyId}/employees
+  - GET /ops/diagnostics
+
+Current evidence snapshot (2026-05-14):
+- API: 15 passed
+- E2E: 1 passed
+- Backend coverage: 86%
+- coverage xml: code/tests/api/coverage.xml
+
+Agent 4 completion decision:
+- QA minimum plan remains satisfied for MVP.
+- Expansion contracts now have direct API evidence.
+- Single required UI path remains green and screenshot archiving is enabled per run.

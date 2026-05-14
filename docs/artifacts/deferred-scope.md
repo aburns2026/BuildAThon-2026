@@ -15,3 +15,7 @@ The following items are intentionally deferred and excluded from this MVP:
 
 ## Deferral Principle
 If a feature does not directly improve the MVP demo path (clock-in, validation, clock-out, history, audit, payroll summary), it stays deferred.
+
+## Post-MVP Expansion Note
+
+The first approved post-MVP expansion slice is missing punch detection (EXP-A1 to EXP-A3). All other deferred items remain deferred until that slice is stable.

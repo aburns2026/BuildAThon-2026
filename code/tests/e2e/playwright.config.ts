@@ -4,9 +4,11 @@ export default defineConfig({
   testDir: "./specs",
   timeout: 60_000,
   retries: 0,
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "on-first-retry",
+    screenshot: "on",
     headless: true,
   },
   webServer: [

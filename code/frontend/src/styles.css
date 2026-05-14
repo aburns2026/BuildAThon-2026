@@ -14,6 +14,22 @@ body {
   min-height: 100vh;
 }
 
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+}
+
+.skip-link:focus {
+  left: 1rem;
+  top: 1rem;
+  z-index: 1000;
+}
+
 .page {
   max-width: 980px;
   margin: 0 auto;
@@ -79,6 +95,12 @@ button.secondary {
 button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #0ea5e9;
+  outline-offset: 2px;
 }
 
 .message {

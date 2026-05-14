@@ -1,13 +1,24 @@
 from fastapi.testclient import TestClient
+from datetime import UTC, datetime, timedelta
+from sqlalchemy import desc
 
+from backend.db import SessionLocal
 from backend.main import app
+from backend.models import Shift
 
 
 client = TestClient(app)
 
 
+def auth_headers(token: str = "demo-employee-token", extra: dict[str, str] | None = None) -> dict[str, str]:
+    headers = {"Authorization": f"Bearer {token}"}
+    if extra:
+        headers.update(extra)
+    return headers
+
+
 def test_clock_in_success() -> None:
-    response = client.post("/employees/E001/clock-in")
+    response = client.post("/employees/E001/clock-in", headers=auth_headers())
 
     assert response.status_code == 200
     body = response.json()
@@ -18,20 +29,20 @@ def test_clock_in_success() -> None:
 
 
 def test_duplicate_clock_in_rejected() -> None:
-    first = client.post("/employees/E001/clock-in")
+    first = client.post("/employees/E001/clock-in", headers=auth_headers())
     assert first.status_code in (200, 409)
 
-    response = client.post("/employees/E001/clock-in")
+    response = client.post("/employees/E001/clock-in", headers=auth_headers())
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Duplicate clock-in: open shift exists"
 
 
 def test_clock_out_success_after_open_shift() -> None:
-    maybe_open = client.post("/employees/E001/clock-in")
+    maybe_open = client.post("/employees/E001/clock-in", headers=auth_headers())
     assert maybe_open.status_code in (200, 409)
 
-    response = client.post("/employees/E001/clock-out")
+    response = client.post("/employees/E001/clock-out", headers=auth_headers())
 
     assert response.status_code == 200
     body = response.json()
@@ -42,10 +53,10 @@ def test_clock_out_success_after_open_shift() -> None:
 
 
 def test_get_shifts_returns_closed_shift_history() -> None:
-    assert client.post("/employees/E001/clock-in").status_code == 200
-    assert client.post("/employees/E001/clock-out").status_code == 200
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
 
-    response = client.get("/employees/E001/shifts")
+    response = client.get("/employees/E001/shifts", headers=auth_headers())
 
     assert response.status_code == 200
     body = response.json()
@@ -58,10 +69,10 @@ def test_get_shifts_returns_closed_shift_history() -> None:
 
 
 def test_get_audit_events_returns_punch_event_history() -> None:
-    assert client.post("/employees/E001/clock-in").status_code == 200
-    assert client.post("/employees/E001/clock-out").status_code == 200
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
 
-    response = client.get("/employees/E001/audit-events")
+    response = client.get("/employees/E001/audit-events", headers=auth_headers())
 
     assert response.status_code == 200
     body = response.json()
@@ -73,12 +84,13 @@ def test_get_audit_events_returns_punch_event_history() -> None:
 
 
 def test_get_payroll_summary_returns_closed_shift_totals() -> None:
-    assert client.post("/employees/E001/clock-in").status_code == 200
-    assert client.post("/employees/E001/clock-out").status_code == 200
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
 
     response = client.get(
         "/employees/E001/payroll-summary",
         params={"period_start": "2026-05-14", "period_end": "2026-05-14"},
+        headers=auth_headers(),
     )
 
     assert response.status_code == 200
@@ -89,3 +101,60 @@ def test_get_payroll_summary_returns_closed_shift_totals() -> None:
     assert body["total_minutes_worked"] >= 0
     assert body["period_start"] == "2026-05-14"
     assert body["period_end"] == "2026-05-14"
+
+
+def test_missing_punch_exceptions_empty_for_recent_open_shift() -> None:
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+
+    response = client.get(
+        "/employees/E001/missing-punch-exceptions",
+        params={"threshold_minutes": 60},
+        headers=auth_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["threshold_minutes"] == 60
+    assert body["exceptions"] == []
+
+
+def test_missing_punch_exceptions_flag_for_old_open_shift() -> None:
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    db = SessionLocal()
+    try:
+        shift = (
+            db.query(Shift)
+            .filter(Shift.employee_id == "E001", Shift.state == "OPEN")
+            .order_by(desc(Shift.start_at))
+            .first()
+        )
+        assert shift is not None
+        shift.start_at = datetime.now(UTC) - timedelta(minutes=120)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(
+        "/employees/E001/missing-punch-exceptions",
+        params={"threshold_minutes": 60},
+        headers=auth_headers(),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["exceptions"]) == 1
+    exception = body["exceptions"][0]
+    assert exception["employee_id"] == "E001"
+    assert exception["status"] == "MISSING_PUNCH"
+    assert exception["elapsed_minutes"] >= 120
+
+
+def test_missing_punch_exceptions_invalid_threshold_rejected() -> None:
+    response = client.get(
+        "/employees/E001/missing-punch-exceptions",
+        params={"threshold_minutes": 0},
+        headers=auth_headers(),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "threshold_minutes must be greater than 0"
