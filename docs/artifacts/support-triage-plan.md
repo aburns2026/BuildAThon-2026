@@ -1,7 +1,7 @@
 # Support Triage Output (Step 6)
 
 Date: 2026-05-14
-Scope: MVP + post-MVP expansion operational triage (demo-friendly)
+Scope: current operational triage posture (demo-friendly)
 
 ## 1. Likely Incident Types
 
@@ -17,12 +17,13 @@ Scope: MVP + post-MVP expansion operational triage (demo-friendly)
 
 ## 2. Minimum Logging and Observability Needs
 
-- API request log: method, route, employee_id, status_code, response_time_ms
+- API request log: request_id, method, route, status_code, response_time_ms
 - Business event log: CLOCK_IN_ACCEPTED, CLOCK_IN_REJECTED, CLOCK_OUT_ACCEPTED, CLOCK_OUT_REJECTED
 - Error log: validation failures and exception summary without sensitive internals
 - UI console capture during demo for failed network calls
 - Request correlation by employee_id for all employee-scoped endpoints
-- Lightweight periodic snapshot of `/ops/diagnostics` during demo runs
+- Lightweight periodic snapshot of `/ops/diagnostics` and `/metrics` during demo runs
+- External dashboarding through Grafana and alert evaluation through Prometheus/Alertmanager during demo support windows
 
 ## 3. Triage Steps for Most Likely Incident (Invalid or Missing Punch)
 
@@ -76,15 +77,25 @@ Add one compact support runbook card in demo notes:
 
 ## 6. Quick Triage Commands (Demo Operator)
 
+Use bearer authorization on non-health endpoints.
+
 - Punch state:
-	- `curl -s http://127.0.0.1:8000/employees/E001/shifts | jq`
-	- `curl -s http://127.0.0.1:8000/employees/E001/audit-events | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/employees/E001/shifts | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/employees/E001/audit-events | jq`
 - Missing punch:
-	- `curl -s "http://127.0.0.1:8000/employees/E001/missing-punch-exceptions?threshold_minutes=60" | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" "http://127.0.0.1:8000/employees/E001/missing-punch-exceptions?threshold_minutes=60" | jq`
 - Leave flow:
-	- `curl -s http://127.0.0.1:8000/employees/E001/leave-requests | jq`
-	- `curl -s http://127.0.0.1:8000/employees/E001/leave-balance | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/employees/E001/leave-requests | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/employees/E001/leave-balance | jq`
 - Scheduling:
-	- `curl -s http://127.0.0.1:8000/employees/E001/scheduled-shifts | jq`
+	- `curl -s -H "Authorization: Bearer demo-manager-token" -H "x-role: MANAGER" http://127.0.0.1:8000/employees/E001/scheduled-shifts | jq`
 - Ops health snapshot:
-	- `curl -s http://127.0.0.1:8000/ops/diagnostics | jq`
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/ops/diagnostics | jq`
+- Metrics snapshot:
+	- `curl -s -H "Authorization: Bearer demo-employee-token" http://127.0.0.1:8000/metrics`
+
+## 7. Current Support Caveats
+
+- UI triage now covers the time-capture slice, leave workflow basics, scheduling, payroll detail, and compliance basics.
+- Broader reporting and enterprise workflows are still best triaged directly through API endpoints.
+- External dashboarding and alert evaluation are present, but downstream notification receivers remain minimal.

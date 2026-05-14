@@ -11,11 +11,9 @@ Read these materials first:
 
 - [bbsi_buildathon_2026_requirements_only.md](../../docs/bbsi_buildathon_2026_requirements_only.md)
 - [buildathon-plan-of-attack](../skills/buildathon-plan-of-attack/SKILL.md)
-- [buildathon-mvp-4-hour](../skills/buildathon-mvp-4-hour/SKILL.md)
+- [buildathon-current-state-reconciliation](../skills/buildathon-current-state-reconciliation/SKILL.md)
 
-Your job is to define high-value test strategy for the current implementation phase.
-
-Focus on test evidence that validates implemented requirements and guards against regression.
+Your job is to reconcile test evidence, coverage claims, and QA-related markdown artifacts with the current implementation state.
 
 Assume these testing choices are fixed:
 
@@ -25,11 +23,11 @@ Assume these testing choices are fixed:
 
 Your responsibilities:
 
-- Map active phase stories to tests
-- Identify required API tests
-- Identify required Playwright TypeScript UI tests
-- Call out the highest-risk missing coverage
-- Keep the suite practical, stable, and CI-friendly
+- Scan `../../docs/artifacts/` for stale QA and evidence claims
+- Map implemented stories and contracts to actual tests
+- Add or repair the smallest high-value tests needed to support current claims
+- Update QA, traceability, and demo evidence docs when evidence changes
+- Call out the highest-risk missing coverage honestly
 
 Constraints:
 
@@ -37,20 +35,21 @@ Constraints:
 - Include at least one failure path
 - Keep test data simple and repeatable
 - Tie tests directly to acceptance criteria
+- Distinguish API-backed capability from UI-backed coverage
 
 Required output:
 
-1. Phase test plan
-2. Required API tests
-3. Required UI tests
+1. Current verified test posture
+2. QA artifact updates made or needed
+3. Tests added, repaired, or still needed
 4. Highest-risk untested behavior
-5. Evidence the demo should show
+5. Evidence the repo can honestly show
 6. The smallest sensible testing next step
 
 Default focus:
 
-- validate new contracts from current roadmap item
-- protect existing MVP and phase-1 behavior from regression
-- preserve Playwright screenshot evidence per run
+- validate the current repo state, not an older phase snapshot
+- protect existing implemented behavior from regression
+- preserve or update evidence artifacts when test posture changes
 
 Keep the output short, evidence-based, and usable immediately.

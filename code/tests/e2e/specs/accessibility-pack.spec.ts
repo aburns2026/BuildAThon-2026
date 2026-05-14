@@ -23,6 +23,13 @@ test("Accessibility pack: landmarks and names are present", async ({ page, reque
 
   await expect(page.getByRole("button", { name: "Clock in employee E001" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Clock out employee E001" })).toBeVisible();
+  await expect(page.getByLabel("Leave start date")).toBeVisible();
+  await expect(page.getByLabel("Leave end date")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Submit Leave Request" })).toBeVisible();
+  await expect(page.getByLabel("Scheduled start")).toBeVisible();
+  await expect(page.getByLabel("Scheduled end")).toBeVisible();
+  await expect(page.getByLabel("Break minutes")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Schedule Shift" })).toBeVisible();
 
   const status = page.locator("p.message");
   await expect(status).toHaveAttribute("role", "status");
@@ -57,9 +64,13 @@ test("Accessibility pack: skip link and headings remain usable", async ({ page, 
   await expect(skipLink).toHaveAttribute("href", "#main-content");
 
   const headings = page.getByRole("heading");
-  await expect(headings).toHaveCount(5);
+  await expect(headings).toHaveCount(9);
   await expect(page.getByRole("heading", { level: 2, name: "Shift History" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Payroll Summary" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Payroll Breakdown" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Compliance Report" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Leave Workflow" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Scheduling Workflow" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Audit Events" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Missing Punch Exceptions" })).toBeVisible();
 });

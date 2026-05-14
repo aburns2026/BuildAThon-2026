@@ -59,3 +59,39 @@ class ScheduledShift(Base):
     break_compliant: Mapped[int] = mapped_column(Integer, nullable=False)
     covers_core_hours: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class TimeCorrection(Base):
+    __tablename__ = "time_corrections"
+
+    correction_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.employee_id"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    requested_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class PtoAdjustment(Base):
+    __tablename__ = "pto_adjustments"
+
+    adjustment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.employee_id"), nullable=False, index=True)
+    days_delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CompTimeAdjustment(Base):
+    __tablename__ = "comp_time_adjustments"
+
+    adjustment_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    employee_id: Mapped[str] = mapped_column(ForeignKey("employees.employee_id"), nullable=False, index=True)
+    minutes_delta: Mapped[int] = mapped_column(Integer, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PolicySetting(Base):
+    __tablename__ = "policy_settings"
+
+    policy_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    int_value: Mapped[int] = mapped_column(Integer, nullable=False)

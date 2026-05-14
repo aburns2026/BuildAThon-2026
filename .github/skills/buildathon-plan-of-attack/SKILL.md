@@ -9,8 +9,11 @@ user-invocable: true
 
 Use this skill before implementation. It converts the three repo documents into a phased delivery plan and a set of smaller skills that can be implemented independently without losing traceability or governance.
 
-If the BuildAThon is time-boxed to roughly four hours, do not use this skill by itself as the execution target.
-Read this skill for the big picture, then switch immediately to `../buildathon-mvp-4-hour/SKILL.md` and treat that MVP skill as the primary execution mode.
+If the repository already contains a working implementation, start by assessing current code, tests, and living docs before proposing new work.
+Treat `docs/artifacts/` as a mix of planning history and current-state project records, and update them when they no longer match the source-of-truth requirements or the implemented repo.
+
+Use this skill for orchestration and repo-wide sequencing.
+For current repository maintenance, pair it with `../buildathon-current-state-reconciliation/SKILL.md`.
 
 ## Source Documents
 
@@ -46,18 +49,16 @@ Treat these as committed choices for planning, prompting, and implementation.
 - Treat QA, security, platform, support, and BugBot workflows as part of the product, not cleanup work.
 - Work in thin vertical slices, but keep ownership separated by skill so agents can collaborate predictably.
 
-## Preferred 4-Hour Mode
+## Current Repository Maintenance Mode
 
-When time is severely constrained, use `../buildathon-mvp-4-hour/SKILL.md` as the execution overlay.
+When the repository already contains implementation and stale docs, use `../buildathon-current-state-reconciliation/SKILL.md` as the execution overlay.
 
-That MVP skill is the preferred entry point for a four-hour BuildAThon because it narrows scope to a credible time-capture slice, defines explicit deferrals, and keeps the demo target realistic.
-
-In 4-hour mode:
+In maintenance mode:
 
 1. Read this plan skill for structure and context.
-2. Switch to the MVP skill as the operational source of truth.
-3. Use the role prompts only to move the MVP forward.
-4. Do not expand back toward the full platform unless the MVP is stable.
+2. Read the reconciliation skill to assess docs, code, tests, and source-of-truth drift.
+3. Use the role prompts to update artifacts and implement the smallest necessary fixes.
+4. Keep traceability, evidence, and cross-file consistency current as you go.
 
 ## What Success Looks Like
 
@@ -352,7 +353,7 @@ Each child skill must leave behind artifacts that the next skill can consume wit
 - Do not let backend work outrun story-level validation rules.
 - Do not call the platform complete without a reproducible setup path and visible observability hooks.
 
-## Suggested MVP For BuildAThon Time Constraints
+## Suggested Initial Priority Order
 
 If time is tight, prioritize this order:
 
@@ -366,9 +367,9 @@ If time is tight, prioritize this order:
 ## How To Use This Skill
 
 1. Read the three source documents.
-2. If the session is time-boxed, read `../buildathon-mvp-4-hour/SKILL.md` and adopt it as the primary execution target.
+2. Read `../buildathon-current-state-reconciliation/SKILL.md` if the repo already contains implementation or stale artifacts.
 3. Create or update the planning artifacts that are justified for the available time.
-4. Pick the current functional slice.
+4. Pick the current functional slice or documentation drift area.
 5. Create the minimum child skills needed for that slice, or use targeted role prompts if that is faster.
 6. Implement, test, secure, and operationalize the slice without widening scope unnecessarily.
 7. Update traceability and roadmap before moving to the next slice.

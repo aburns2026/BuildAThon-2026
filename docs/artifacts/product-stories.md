@@ -1,9 +1,10 @@
-# Product Stories (Time Tracking App)
+# Product Stories (Current State)
 
 Date: 2026-05-14
-Source: docs/bbsi_buildathon_2026_requirements_only.md (section 4 only)
+Source: docs/bbsi_buildathon_2026_requirements_only.md (sections 4 and 5)
 
-This document contains only product stories for the workforce time tracking application. It excludes governance/process stories and agent workflow responsibilities.
+This document contains product stories derived from the functional and technical source-of-truth requirements.
+It excludes governance/process stories and agent workflow responsibilities.
 
 ## Epic 1: Workforce Time Management
 
@@ -85,8 +86,8 @@ As platform/payroll engineering, I want integration-ready payload contracts so f
 
 ## Epic 4: Compliance and Reporting
 
-### Story CR-1: Tax and Labor-Rule Validation Visibility
-As compliance stakeholders, I want tax/labor validation outcomes so compliance posture is visible.
+### Story CR-1: Tax and Labor-Rule Validations
+As compliance stakeholders, I want tax and labor-rule validations so compliance risks are detected explicitly.
 
 ### Story CR-2: Compliance Reporting
 As compliance stakeholders, I want compliance reports so regulatory checks are reviewable.
@@ -134,9 +135,55 @@ As an enterprise admin, I want role-based authorization checks so actions are co
 ### Story ENT-5: Enterprise Scalability Considerations
 As platform engineering, I want stateless, API-first contracts so enterprise scaling and integration patterns remain feasible.
 
+## Epic 7: Technical Architecture and Integration Readiness
+
+### Story TAR-1: Web Application API Support
+As a web application, I want stable workforce APIs so browser-based workflows can integrate cleanly.
+
+### Story TAR-2: Mobile Application API Support
+As a mobile application, I want the same workforce APIs so mobile workflows can reuse platform contracts safely.
+
+### Story TAR-3: Enterprise Integration API Support
+As an enterprise integrator, I want integration-ready APIs and payloads so downstream systems can consume workforce data.
+
+### Story TAR-4: Future Extensibility by API Design
+As platform engineering, I want API-first contracts designed for extension so future capabilities can be added with lower risk.
+
+### Story TAR-5: Stateless Service Alignment
+As platform engineering, I want stateless service behavior so the application can scale horizontally.
+
+### Story TAR-6: API-Based Communication
+As platform engineering, I want service interactions to remain API-based so clients and integrations stay decoupled.
+
+### Story TAR-7: Container-Ready Architecture
+As platform engineering, I want container-ready packaging so deployment options remain portable.
+
+### Story TAR-8: Secure Secret Management
+As security engineering, I want secure secret-management patterns so credentials are not exposed through code or runtime workflows.
+
+### Story TAR-9: Observability Support
+As operations, I want observability support so service health and runtime behavior can be understood quickly.
+
+### Story TAR-10: Logging and Monitoring Support
+As support and operations, I want logging and monitoring support so incidents can be diagnosed with evidence.
+
+### Story TAR-11: Future CIAM Integration Readiness
+As platform engineering, I want future CIAM integration to remain feasible so identity controls can evolve without redesign.
+
+### Story TAR-12: Future Enterprise Domain Integration Readiness
+As integration engineering, I want future enterprise domain integrations to remain feasible so external systems can connect with low risk.
+
+### Story TAR-13: Future Event-Driven Integration Readiness
+As platform engineering, I want future event-driven patterns to remain feasible so asynchronous integration can be added later.
+
+### Story TAR-14: Future Cloud-Native Extensibility
+As platform engineering, I want future cloud-native extensibility so the platform can evolve without architectural lock-in.
+
 ## Count Summary
 
 - Functional epics: 6
 - Functional stories: 39 (sections 4.1 to 4.6)
+- Technical epics: 1
+- Technical stories: 14 (section 5)
 - Governance/process stories included: 0
-- Total stories in this file: 39
+- Total stories in this file: 53

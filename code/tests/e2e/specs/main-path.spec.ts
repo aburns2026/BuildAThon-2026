@@ -54,8 +54,18 @@ test("MVP flow: clock in, duplicate validation, clock out, and summary visibilit
   await expect(shiftHistoryCard.getByRole("heading", { name: "Shift History" })).toBeVisible();
   await expect(shiftHistoryCard.getByText("CLOSED", { exact: true }).first()).toBeVisible();
 
-  await expect(page.getByRole("heading", { name: "Payroll Summary" })).toBeVisible();
-  await expect(page.getByText("Closed Shifts", { exact: false })).toBeVisible();
+  const summaryCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Payroll Summary" }) });
+  await expect(summaryCard.getByRole("heading", { name: "Payroll Summary" })).toBeVisible();
+  await expect(summaryCard.getByText("Closed Shifts", { exact: false })).toBeVisible();
+
+  const breakdownCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Payroll Breakdown" }) });
+  await expect(breakdownCard.getByRole("heading", { name: "Payroll Breakdown" })).toBeVisible();
+  await expect(breakdownCard.getByText("Regular Minutes", { exact: false })).toBeVisible();
+
+  const complianceCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Compliance Report" }) });
+  await expect(complianceCard.getByRole("heading", { name: "Compliance Report" })).toBeVisible();
+  await expect(complianceCard.getByText("Tax Validation Status", { exact: false })).toBeVisible();
+  await expect(complianceCard.getByText("PASS", { exact: true }).first()).toBeVisible();
 
   const auditCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Audit Events" }) });
   await expect(auditCard.getByRole("heading", { name: "Audit Events" })).toBeVisible();

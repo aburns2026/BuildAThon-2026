@@ -1,0 +1,29 @@
+groups:
+  - name: buildathon-runtime
+    rules:
+      - alert: BuildathonApiDown
+        expr: up{job="buildathon-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: BuildAThon API target is down
+          description: Prometheus cannot scrape the BuildAThon API metrics endpoint.
+
+      - alert: BuildathonDatabaseDown
+        expr: buildathon_database_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: BuildAThon database health is degraded
+          description: The API reports that database connectivity is unavailable.
+
+      - alert: BuildathonRequestFailuresDetected
+        expr: increase(buildathon_request_failures_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: BuildAThon request failures detected
+          description: The API recorded one or more failed requests during the last five minutes.

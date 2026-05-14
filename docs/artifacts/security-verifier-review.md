@@ -1,4 +1,4 @@
-# Security Verifier Output (Current)
+# Security Verifier Review (Current State)
 
 Date: 2026-05-14
 Prompt Run: .github/prompts/buildathon-security-verifier-agent.prompt.md
@@ -6,47 +6,47 @@ Code Reviewed: code/backend/main.py, code/frontend/src/App.tsx, code/tests/api/*
 
 ## 1. Security Posture Summary
 
-Security posture is acceptable for closed-demo use, but not production-ready.
-Input validation and contract hardening are good, with tests backing critical paths.
-The primary risks are trust-model and tenant-isolation weaknesses, not parser/validation bugs.
+Security posture is acceptable for demo use, but it is not production-ready.
+Input validation, request hardening, role enforcement, and company-claim enforcement are all present and backed by tests.
+The remaining risks are architectural and trust-model gaps rather than basic parser or contract bugs.
 
-## 2. Must-Fix Findings
+## 2. Resolved Findings
 
-1. Role spoofing risk in header-driven authorization
-- Risk: caller-controlled x-role header can grant elevated permissions.
-- Evidence: code/backend/main.py role resolution and authorization checks.
-- Must-fix direction: require an authorization header stub and reject unauthenticated requests on non-health endpoints.
-- Status: Implemented on 2026-05-14.
-- Implementation evidence: bearer-token auth stub with non-health middleware enforcement and principal-bound role resolution in code/backend/main.py.
-- Test evidence: unauthorized non-health rejection and role-spoof mismatch tests in code/tests/api/test_security_hardening.py.
+1. Non-health endpoints now require bearer authorization.
+2. `x-role` spoofing is rejected when it does not match the authenticated principal.
+3. Company-scoped endpoints now require a matching `x-company-id` claim.
 
-2. Company data isolation gap on company-scoped endpoints
-- Risk: payroll and location exports rely on path company_id but do not verify requester tenancy membership.
-- Evidence: company payroll and integration endpoints in code/backend/main.py.
-- Must-fix direction: enforce x-company-id match (or equivalent principal claim) before returning company data.
+## 3. Remaining Findings
 
-3. In-process sensitive adjustment state
-- Risk: TIME_CORRECTIONS, PTO_ADJUSTMENTS, COMP_TIME_ADJUSTMENTS live in process memory and bypass durable audit/tenant controls.
-- Evidence: module-level stores in code/backend/main.py.
-- Must-fix direction: migrate these collections to DB-backed tables and query paths.
+1. Demo-only authentication model
+- Risk: static bearer tokens are suitable for demo hardening but not for real identity assurance.
+- Impact: CIAM, user lifecycle, and stronger token validation remain unimplemented.
+- Direction: replace the auth stub with a real JWT/OIDC or CIAM integration boundary when the repo moves past demo posture.
 
-## 3. Acceptable Deferred Findings
+2. Runtime scaling and configuration maturity gap
+- Risk: local development still defaults to SQLite and runtime request counters remain instance-local.
+- Impact: horizontal scaling claims remain partial even though workflow and policy state are DB-backed and the containerized deployment path now uses PostgreSQL.
+- Direction: move local development toward a deployment-grade database default and add shared telemetry aggregation if stronger scaling claims are needed.
+
+3. Secret, logging, and monitoring maturity gap
+- Risk: environment-based configuration, request logging, built-in metrics, and external monitoring stack assets now exist, but no dedicated secret-management integration or downstream notification integration is present.
+- Impact: technical requirement coverage for secure runtime operations is only partial.
+- Direction: add secret-handling guidance and wire Alertmanager or Grafana alerting to a real downstream receiver before making stronger platform claims.
+
+## 4. Acceptable Deferred Findings
 
 1. Full JWT/OIDC/CIAM implementation.
-2. Advanced abuse protections (rate limiting, anomaly detection).
-3. WAF/ingress hardening beyond localhost demo perimeter.
-4. Full CI SAST/DAST policy gate.
+2. Advanced abuse protections such as rate limiting and anomaly detection.
+3. WAF or ingress hardening beyond local/demo perimeter assumptions.
+4. Full CI security gates such as SAST, DAST, and dependency policy enforcement.
 
-## 4. Safe-Demo Recommendations
+## 5. Safe-Demo Recommendations
 
 1. Keep demo data synthetic only.
 2. Keep CORS origins tightly scoped to localhost hosts.
-3. Disable debug trace verbosity in demo run scripts.
-4. Explicitly disclose demo trust model in handoff notes.
-5. Add negative tests for unauthorized role/tenant mismatches once auth stub is added.
+3. Use the existing negative auth and tenant-isolation tests as part of the security narrative.
+4. State clearly that the repo uses a demo auth stub rather than production identity controls.
 
-## 5. Smallest Sensible Security Next Step
+## 6. Smallest Sensible Security Next Step
 
-Add company-claim enforcement to all company-scoped read/export endpoints and ship two API tests:
-- reject missing x-company-id header,
-- reject x-company-id mismatch versus requested company_id.
+Replace the demo auth stub with a stronger identity boundary or, if that is out of scope, wire the new alerting stack to a real downstream receiver and secret-management boundary.

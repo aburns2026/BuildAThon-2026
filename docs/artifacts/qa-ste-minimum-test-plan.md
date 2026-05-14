@@ -1,137 +1,69 @@
-# QA/STE Step Output: Minimum MVP Test Plan
+# QA/STE Test Plan (Current State)
 
 Date: 2026-05-14
-Scope Constraint: docs/artifacts/scope-lock.md
 Stack: FastAPI API + React UI + Playwright TypeScript
 
-## 1. MVP Test Plan
+## Current Automated Evidence
 
-Goal: prove the main MVP demo path with the fewest high-value tests.
+- API suite: 37 passed
+- Playwright suite: 7 passed
+- Backend coverage: 90%
 
-Coverage target:
-- one happy path from clock-in to clock-out
-- one failure path for duplicate or invalid punch
-- visibility check for summary/history output
+## API Test Coverage
 
-Test approach:
-- API-first verification for business rules
-- one UI E2E test for demo confidence
-- deterministic demo employee and repeatable timestamps where possible
+Files currently in scope:
 
-## 2. Minimum API Tests
+- code/tests/api/test_health.py
+- code/tests/api/test_time_capture.py
+- code/tests/api/test_expansion_contracts.py
+- code/tests/api/test_phase2_contracts.py
+- code/tests/api/test_security_hardening.py
 
-### API-1: Successful Clock-In
-- Endpoint: POST /employees/{employeeId}/clock-in
-- Given: employee exists and has no open shift
-- Expect:
-  - HTTP 200
-  - status indicates CLOCKED_IN
-  - shift_id returned
-  - audit event recorded as CLOCK_IN_ACCEPTED
-- Maps to: MVP-1
+The API suite verifies:
 
-### API-2: Duplicate Clock-In Rejected
-- Endpoint: POST /employees/{employeeId}/clock-in
-- Given: employee already has open shift
-- Expect:
-  - HTTP 409
-  - clear validation message
-  - audit event recorded as CLOCK_IN_REJECTED
-- Maps to: MVP-2
+- time capture happy paths and rejection paths
+- audit-event persistence and read models
+- missing punch detection and attendance exceptions
+- time corrections, leave workflows, leave balances, and scheduled shifts
+- payroll summary, timesheets, breakdown, PTO, comp time, payroll export, and integration payloads
+- operational reports, crosscheck reports, policy updates, and authorization checks
+- authorization, role-claim, and company-claim enforcement
 
-### API-3: Successful Clock-Out
-- Endpoint: POST /employees/{employeeId}/clock-out
-- Given: employee has open shift
-- Expect:
-  - HTTP 200
-  - status indicates CLOCKED_OUT
-  - duration_minutes > 0
-  - audit event recorded as CLOCK_OUT_ACCEPTED
-- Maps to: MVP-3
+## Playwright Coverage
 
-### API-4 (Optional if time remains): Payroll Summary Shape
-- Endpoint: GET /employees/{employeeId}/payroll-summary
-- Given: at least one closed shift
-- Expect:
-  - HTTP 200
-  - total_minutes_worked present
-  - closed_shift_count present
-- Maps to: MVP-6
+Files currently in scope:
 
-## 3. Minimum UI Test (Playwright TypeScript)
+- code/tests/e2e/specs/main-path.spec.ts
+- code/tests/e2e/specs/accessibility-pack.spec.ts
+- code/tests/e2e/specs/mobile-accessibility.spec.ts
+- code/tests/e2e/specs/leave-workflow.spec.ts
+- code/tests/e2e/specs/scheduling-workflow.spec.ts
 
-### UI-E2E-1: Main Path Clock-In to Clock-Out
-- Setup:
-  - run API and UI locally
-  - use demo employee fixture
-- Steps:
-  1. open time-capture page
-  2. select employee (or fixed demo employee)
-  3. click Clock In
-  4. verify status shows CLOCKED_IN
-  5. click Clock Out
-  6. verify status shows CLOCKED_OUT
-  7. verify shift history or summary section updates
-- Assertions:
-  - user sees successful transitions
-  - no uncaught UI errors
-  - summary/history displays new shift row or updated totals
-- Maps to: MVP-1, MVP-3, MVP-4
+The Playwright suite verifies:
 
-## 4. Highest-Risk Untested Behavior
+- main browser punch flow from clock-in to clock-out
+- leave request creation, manager approval, and leave-balance visibility
+- manager scheduling workflow creation and scheduled-shift visibility
+- duplicate punch rejection visibility
+- shift history, payroll summary, payroll breakdown, compliance visibility, and audit visibility in the UI
+- skip link, headings, landmarks, accessible names, live-region messaging, and keyboard interaction
+- responsive/mobile accessibility baseline
 
-- Clock-out rejection when no open shift exists may remain untested if API-4 is prioritized.
-- Audit event content quality (details text semantics) may not be deeply validated.
-- Timezone and boundary-time behavior (midnight crossings) is likely uncovered in MVP window.
+## Highest-Value Remaining QA Gaps
 
-## 5. Demo Evidence To Show
+- The React UI does not yet cover enterprise admin workflows or broader reporting views.
+- Runtime APIs and monitoring configs are validated, but stack startup and image-build checks are not yet part of the automated test suite.
 
-- API test run output proving pass/fail for the three minimum tests.
-- Playwright run output or report for UI-E2E-1.
-- one failure-path evidence artifact (duplicate punch rejection message).
-- screenshot or log snippet showing updated shift summary/history after clock-out.
+## Demo Evidence To Show
 
-## 6. Smallest Sensible Testing Next Step
-
-Implement API-1, API-2, API-3 immediately in code/tests/api and make them runnable with one command.
-After API tests are green, add UI-E2E-1 in code/tests/e2e and run headless once for evidence.
+- API test output for the full API suite
+- Playwright output for the full frontend suite
+- archived screenshots under artifacts/playwright-runs/
+- one clear explanation of which requirements are API-backed only versus UI-backed
 
 ## Suggested Commands
 
 - API tests:
-  - PYTHONPATH=$PWD/code python3 -m pytest code/tests/api -q
-- Playwright tests (once configured):
-  - npx playwright test --reporter=line
-
-## 7. Post-MVP Expansion QA Addendum (Agent 4)
-
-Expanded scope validated in this step:
-- leave request creation, approval, and balance contracts
-- time correction request/list contracts
-- scheduled shift create/list contracts
-- payroll breakdown and compliance report contracts
-- enterprise company employee listing and ops diagnostics contracts
-
-Expanded API tests:
-- file: code/tests/api/test_expansion_contracts.py
-- validated endpoints:
-  - POST/GET /employees/{employeeId}/time-corrections
-  - POST/GET /employees/{employeeId}/leave-requests
-  - POST /leave-requests/{leaveRequestId}/approve
-  - GET /employees/{employeeId}/leave-balance
-  - POST/GET /employees/{employeeId}/scheduled-shifts
-  - GET /employees/{employeeId}/payroll-breakdown
-  - GET /employees/{employeeId}/compliance-report
-  - GET /companies/{companyId}/employees
-  - GET /ops/diagnostics
-
-Current evidence snapshot (2026-05-14):
-- API: 15 passed
-- E2E: 1 passed
-- Backend coverage: 86%
-- coverage xml: code/tests/api/coverage.xml
-
-Agent 4 completion decision:
-- QA minimum plan remains satisfied for MVP.
-- Expansion contracts now have direct API evidence.
-- Single required UI path remains green and screenshot archiving is enabled per run.
+  - PYTHONPATH=$PWD/code pytest --cov=app code/tests/api
+- Playwright tests:
+  - cd code/tests/e2e && npx playwright test

@@ -1,8 +1,18 @@
 # E2E Tests (Playwright)
 
-This folder includes the required MVP main-path UI test:
+This folder includes the current Playwright coverage for the frontend slice:
 
 - `specs/main-path.spec.ts`
+- `specs/accessibility-pack.spec.ts`
+- `specs/mobile-accessibility.spec.ts`
+- `specs/leave-workflow.spec.ts`
+- `specs/scheduling-workflow.spec.ts`
+
+Current evidence snapshot:
+
+- 7 passing tests
+- screenshot archiving under `artifacts/playwright-runs/<run-id>/`
+- automatic backend and frontend startup through Playwright config
 
 ## Run
 
@@ -17,6 +27,10 @@ This folder includes the required MVP main-path UI test:
 3. Run tests:
 
 	npm test
+
+4. Run a single spec if needed:
+
+	npx playwright test specs/main-path.spec.ts
 
 The Playwright config starts backend and frontend web servers automatically.
 

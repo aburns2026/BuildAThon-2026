@@ -1,71 +1,46 @@
-# MVP Acceptance Criteria (PO/BA)
+# Acceptance Criteria (Current State)
 
-## MVP-1 Clock-In
-- Given a valid employee with no open shift, when clock-in is submitted, then a punch-in is stored and an open shift is created.
-- Given successful clock-in, when the response returns, then status shows clocked-in with a recorded timestamp.
-- Given a valid clock-in request, when processing completes, then an audit event is recorded for the action.
+Date: 2026-05-14
+Source alignment:
 
-## MVP-2 Duplicate Clock-In Prevention
-- Given an employee with an existing open shift, when another clock-in is submitted, then the request is rejected.
-- Given duplicate clock-in rejection, when response returns, then a clear validation message explains why it failed.
-- Given duplicate rejection, when processing completes, then an audit event is recorded for the rejected action.
+- docs/bbsi_buildathon_2026_requirements_only.md sections 4 and 5
+- docs/artifacts/product-stories.md
 
-## MVP-3 Clock-Out
-- Given an employee with an open shift, when clock-out is submitted, then the shift is closed and duration is computed.
-- Given successful clock-out, when response returns, then status shows clocked-out with a recorded timestamp.
-- Given successful clock-out, when processing completes, then an audit event is recorded.
+## Workforce Time Management
 
-## MVP-4 Shift History or Today Summary
-- Given an employee with recorded shifts, when history or summary is requested, then results include at least start, end, and duration fields.
-- Given no recorded shifts, when history is requested, then an empty result is returned safely.
-- Given API retrieval, when data is displayed in UI, then validation and error states are visible.
+- Given a valid employee with no open shift, when clock-in is submitted, then an open shift is created and an accepted audit event is stored.
+- Given an employee with an open shift, when another clock-in is submitted, then the request is rejected with a safe validation message and a rejected audit event.
+- Given an employee with an open shift, when clock-out is submitted, then the open shift is closed, duration is computed, and an accepted audit event is stored.
+- Given an employee with recorded shifts, when shifts or payroll summary are requested, then the response includes current attendance and worked-time totals.
+- Given an open shift older than the configured threshold, when missing punch exceptions are requested, then the response includes a missing-punch exception entry.
+- Given a browser user on desktop or mobile, when the punch flow is used, then status messaging, responsive layout, and accessible interactions remain usable.
 
-## MVP-5 Audit Visibility
-- Given punch success or rejection, when audit events are requested, then entries include event type, actor or source, timestamp, and target employee context.
-- Given audit retrieval, when no events exist, then an empty list is returned safely.
+## Scheduling and Leave Management
 
-## MVP-6 Payroll-Ready Summary
-- Given completed shifts, when payroll summary is requested, then total worked duration for the selected period is returned.
-- Given an open shift not yet closed, when payroll summary is requested, then behavior is deterministic and documented (excluded or flagged).
-- Given summary response, when consumed by downstream flow, then payload is simple and stable.
+- Given valid leave dates, when a leave request is submitted, then the request is stored with pending status.
+- Given a pending leave request, when manager approval is submitted, then the request status becomes approved.
+- Given approved leave, when leave balance is requested, then used and remaining totals are returned.
+- Given a valid scheduled shift payload, when the shift is created, then it is retrievable for the employee.
+- Given a scheduled shift that violates minimum break policy or configured core hours, when creation is attempted, then the request is rejected with an explicit validation message.
+- Given scheduled shift policy violations or missing punch cases, when attendance exceptions are requested, then the response returns unified exception records.
 
-## EXP-A1 Missing Punch Detection Flag
-- Given an open shift older than threshold, when detection runs, then the shift is marked as a missing-punch exception.
-- Given an open shift newer than threshold, when detection runs, then it is not marked as missing-punch.
-- Given a closed shift, when detection runs, then it is not included in missing-punch exceptions.
+## Payroll and Compensation
 
-## EXP-A2 Missing Punch Exceptions List
-- Given one or more missing-punch exceptions, when exceptions endpoint is requested, then response includes employee_id, shift_id, start_at, elapsed_minutes, and status.
-- Given no exceptions, when endpoint is requested, then an empty list is returned safely.
-- Given invalid employee context, when endpoint is requested, then response returns explicit validation error.
+- Given closed shifts within a requested period, when timesheets are requested, then line-item entries and total minutes are returned.
+- Given closed shifts, when payroll breakdown is requested, then regular, overtime, holiday, and night-shift minutes are returned.
+- Given approved time-off or manager adjustments, when PTO and comp-time balances are requested, then current totals reflect stored adjustments.
+- Given payroll export or payroll integration payload requests, when authorized users call company-scoped endpoints, then stable export-ready payloads are returned.
 
-## EXP-A3 Exception Visibility In UI
-- Given exceptions exist, when UI refreshes, then an exceptions section lists them.
-- Given no exceptions, when UI refreshes, then section shows explicit empty state.
-- Given API error, when UI refreshes, then user sees safe error text without stack details.
+## Compliance, Reporting, and Enterprise Controls
 
-## EXP-B1 Leave Request Workflow
-- Given valid leave dates, when employee submits request, then request is persisted as pending.
+- Given attendance exception and audit data, when operational or crosscheck reports are requested, then the service returns deterministic aggregate or reconciliation output.
+- Given a compliance report request, when the endpoint is called, then the response returns validation-status fields and attendance exception count.
+- Given protected endpoints, when authorization headers are missing or invalid, then the request is rejected safely.
+- Given company-scoped endpoints, when the company claim is missing or mismatched, then the request is rejected safely.
+- Given policy changes, when a non-admin caller attempts to patch policies, then the request is rejected.
 
-## EXP-B2 Leave Approval Workflow
-- Given pending leave request, when manager approval is submitted, then request status becomes approved.
+## Technical Requirement Acceptance Criteria
 
-## EXP-B3 Leave Balance Visibility
-- Given approved leave requests, when leave balance is requested, then used and remaining days are returned.
-
-## EXP-B4 Shift Scheduling Baseline
-- Given schedule payload, when scheduled shift is created, then schedule record is retrievable for the employee.
-
-## EXP-C1 Payroll Breakdown Baseline
-- Given employee payroll breakdown request, when endpoint is called, then breakdown payload includes base and placeholder compensation fields.
-
-## EXP-D1 Compliance Report Skeleton
-- Given compliance report request, when endpoint is called, then compliance payload returns validation statuses and exception count.
-
-## EXP-E1 Enterprise Company/Location Baseline
-- Given company identifier, when employees are listed, then response includes employees scoped to the company.
-
-## Role-Coverage Acceptance Criteria
-- Given PO/BA role gates, when planning artifacts are reviewed, then prioritization and traceability are explicit.
-- Given QA/Security role gates, when evidence artifacts are reviewed, then pass/fail and risk decisions are explicit.
-- Given Platform/Support role gates, when operations are reviewed, then startup/test paths and triage workflows are explicit.
+- Given web and mobile browser clients, when they call the backend, then the workflow contracts are API-backed and reusable across clients.
+- Given current runtime posture, when health or diagnostics are requested, then baseline operational endpoints respond successfully.
+- Given current architecture, when delivery claims are reviewed, then remaining gaps are explicit: real compliance logic, durable state for selected in-memory collections, container packaging, and logging/monitoring support.

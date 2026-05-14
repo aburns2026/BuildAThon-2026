@@ -1,43 +1,23 @@
-# BugBot Output (Step 7)
+# BugBot Defect Record
 
 Date: 2026-05-14
 Defect Type: UI test strict-mode selector collision
+Status: Resolved
 
-## 1. Bug Summary
+## Summary
 
-Playwright E2E test failed on assertion for "Clock-out accepted" because selector matched two elements in strict mode.
+Playwright previously failed on the clock-out success assertion because a broad text selector matched more than one element in strict mode.
 
-## 2. Reproduction Steps
+## Fix Applied
 
-1. Run E2E test suite in `code/tests/e2e`.
-2. Execute `npm test`.
-3. Observe failure where `getByText("Clock-out accepted")` resolves multiple elements.
+- Status assertions were scoped to the dedicated message element.
+- Audit assertions remained scoped to the audit section.
 
-## 3. Probable Root Causes
+## Current Verification
 
-- Generic text selector matched both status message and audit list content.
-- Strict mode requires a unique target element.
+- Main-path Playwright flow passes.
+- The broader Playwright suite now passes with 5 tests.
 
-## 4. Smallest Fix Plan
+## Residual Risk
 
-- Scope status assertions to the UI message element (`p.message`) instead of global text query.
-- Keep audit-event assertions separate for audit section validation.
-
-## 5. Verification Plan
-
-1. Re-run `npm test` in `code/tests/e2e`.
-2. Confirm test passes for:
-   - clock-in success message
-   - duplicate validation message
-   - clock-out success message
-   - history, payroll summary, and audit visibility checks
-
-## 6. Residual Risks
-
-- Future text duplication may reintroduce ambiguity if selectors are broad.
-- Keep selectors anchored to role/region/message container for reliability.
-
-## Evidence Reference
-
-- Updated file: `code/tests/e2e/specs/main-path.spec.ts`
-- Current result: 1 passed
+- Future selector changes should stay anchored to named regions, roles, or dedicated status containers rather than global text searches.

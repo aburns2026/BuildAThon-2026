@@ -5,9 +5,9 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 try:
-    from .models import AuditEvent, Employee, LeaveRequest, ScheduledShift, Shift
+    from .models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, ScheduledShift, Shift, TimeCorrection
 except ImportError:
-    from models import AuditEvent, Employee, LeaveRequest, ScheduledShift, Shift
+    from models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, ScheduledShift, Shift, TimeCorrection
 
 
 def utc_now() -> datetime:
@@ -61,6 +61,26 @@ def scheduled_shift_to_dict(item: ScheduledShift) -> dict:
         "break_compliant": bool(item.break_compliant),
         "covers_core_hours": bool(item.covers_core_hours),
         "status": item.status,
+    }
+
+
+def time_correction_to_dict(item: TimeCorrection) -> dict:
+    return {
+        "correction_id": item.correction_id,
+        "employee_id": item.employee_id,
+        "reason": item.reason,
+        "requested_at": item.requested_at.isoformat(),
+        "status": item.status,
+    }
+
+
+def comp_time_adjustment_to_dict(item: CompTimeAdjustment) -> dict:
+    return {
+        "adjustment_id": item.adjustment_id,
+        "employee_id": item.employee_id,
+        "minutes_delta": item.minutes_delta,
+        "reason": item.reason,
+        "created_at": item.created_at.isoformat(),
     }
 
 

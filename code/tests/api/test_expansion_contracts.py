@@ -70,7 +70,11 @@ def test_payroll_breakdown_and_compliance_report() -> None:
 
     compliance = client.get("/employees/E001/compliance-report", headers=auth_headers())
     assert compliance.status_code == 200
-    assert compliance.json()["tax_validation_status"] == "PASS"
+    compliance_body = compliance.json()
+    assert compliance_body["tax_validation_status"] == "PASS"
+    assert compliance_body["labor_rule_validation_status"] == "PASS"
+    assert len(compliance_body["tax_validations"]) >= 1
+    assert len(compliance_body["labor_rule_validations"]) >= 1
 
 
 def test_company_listing_and_ops_diagnostics() -> None:
@@ -80,4 +84,8 @@ def test_company_listing_and_ops_diagnostics() -> None:
 
     diagnostics = client.get("/ops/diagnostics", headers=auth_headers())
     assert diagnostics.status_code == 200
-    assert "audit_event_count" in diagnostics.json()
+    body = diagnostics.json()
+    assert "audit_event_count" in body
+    assert body["database_status"] == "ok"
+    assert body["database_backend"]
+    assert body["request_count_total"] >= 1

@@ -11,11 +11,9 @@ Read these materials first:
 
 - [bbsi_buildathon_2026_requirements_only.md](../../docs/bbsi_buildathon_2026_requirements_only.md)
 - [buildathon-plan-of-attack](../skills/buildathon-plan-of-attack/SKILL.md)
-- [buildathon-mvp-4-hour](../skills/buildathon-mvp-4-hour/SKILL.md)
+- [buildathon-current-state-reconciliation](../skills/buildathon-current-state-reconciliation/SKILL.md)
 
-Your job is to turn the broad BuildAThon brief into development-ready product requirements across prioritized phases.
-
-Use MVP as a bootstrap phase, then expand to full section 4 functional requirements.
+Your job is to reconcile the product requirements documents with the source-of-truth files and the current repository state.
 
 Assume these implementation choices are fixed:
 
@@ -25,26 +23,25 @@ Assume these implementation choices are fixed:
 
 Your responsibilities:
 
-- Identify the minimum in-scope workflows
-- Write requirements-aligned user stories
-- Write acceptance criteria
-- Define validation rules
-- Define explicit phase boundaries and deferred items
-- Flag ambiguities without widening scope
+- Scan `../../docs/artifacts/` for stale or incomplete product-requirement docs
+- Refresh product stories, acceptance criteria, validation rules, and planning boundaries
+- Update any related artifact files needed for consistency
+- Implement the smallest supporting changes if a doc claim must become true
+- Flag true ambiguities without inventing extra scope
 
 Constraints:
 
-- Prefer phased delivery that preserves end-to-end testability
-- Do not invent extra enterprise features unless the requirements demand them
-- Keep the acceptance criteria testable and implementation-ready
+- Source-of-truth files outrank existing artifacts
+- Do not preserve stale phase language when it no longer matches the repo
+- Keep acceptance criteria testable and implementation-ready
 
 Required output:
 
-1. Short phase summary
-2. In-scope stories for the active phase
-3. Acceptance criteria for each story
-4. Validation and failure rules
-5. Explicit deferred scope and next-phase queue
+1. Short current-state summary
+2. Story and requirements updates made or needed
+3. Acceptance-criteria and validation-rule updates made or needed
+4. Cross-file artifact updates made or needed
+5. Any remaining ambiguities
 6. The smallest sensible next build step
 
 Target product theme:
@@ -56,4 +53,12 @@ Target product theme:
 - mobile workforce support
 - enterprise readiness
 
-Keep the output concise, concrete, and biased toward immediate implementation.
+Default artifact focus:
+
+- `product-stories.md`
+- `acceptance-criteria.md`
+- `validation-rules.md`
+- `planning-framework.md`
+- `requirements-traceability-matrix.md`
+
+Keep the output concise, concrete, and biased toward immediate reconciliation work.

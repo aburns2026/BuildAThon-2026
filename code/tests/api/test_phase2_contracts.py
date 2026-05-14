@@ -223,3 +223,32 @@ def test_policy_config_and_authz_check() -> None:
     )
     assert deny.status_code == 200
     assert deny.json()["allowed"] is False
+
+
+def test_compliance_report_fails_for_missing_punch_and_long_shift() -> None:
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    db = SessionLocal()
+    try:
+        shift = (
+            db.query(Shift)
+            .filter(Shift.employee_id == "E001", Shift.state == "OPEN")
+            .order_by(desc(Shift.start_at))
+            .first()
+        )
+        assert shift is not None
+        shift.start_at = datetime.now(UTC) - timedelta(minutes=780)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/employees/E001/compliance-report", headers=auth_headers())
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["tax_validation_status"] == "WARN"
+    assert body["labor_rule_validation_status"] == "FAIL"
+    assert body["attendance_exception_count"] == 1
+    labor_rules = {item["rule"]: item for item in body["labor_rule_validations"]}
+    assert labor_rules["ATTENDANCE_EXCEPTIONS_CLEAR"]["status"] == "FAIL"
+    assert labor_rules["NO_OPEN_SHIFT_PENDING"]["status"] == "FAIL"
+    assert labor_rules["MAX_SHIFT_DURATION_UNDER_12_HOURS"]["status"] == "PASS"
