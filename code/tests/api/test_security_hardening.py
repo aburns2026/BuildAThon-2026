@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from backend.main import app
+from backend.main import app, bootstrap_application_state
 
 
 client = TestClient(app)
@@ -25,6 +25,21 @@ def test_invalid_bearer_token_rejected() -> None:
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Invalid bearer token"
+
+
+def test_invalid_bearer_token_keeps_cors_headers_for_browser_clients() -> None:
+    response = client.get(
+        "/employees/E001/shifts",
+        headers={
+            "Authorization": "Bearer not-a-real-token",
+            "Origin": "http://127.0.0.1:5173",
+        },
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid bearer token"
+    assert response.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+    assert response.headers["access-control-allow-credentials"] == "true"
 
 
 def test_role_header_spoof_rejected_when_principal_mismatch() -> None:
@@ -158,3 +173,49 @@ def test_operational_report_company_filter_requires_matching_claim() -> None:
     )
     assert mismatch_claim.status_code == 403
     assert mismatch_claim.json()["detail"] == "Company mismatch"
+
+
+def test_demo_support_reset_endpoint_is_gated_and_clears_dirty_state(monkeypatch) -> None:
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    assert client.post(
+        "/employees/E001/leave-requests",
+        json={"start_date": "2026-05-21", "end_date": "2026-05-22"},
+        headers=auth_headers(),
+    ).status_code == 200
+
+    disabled = client.post("/demo-support/reset")
+    assert disabled.status_code == 404
+
+    monkeypatch.setenv("ENABLE_DEMO_RESET_ENDPOINTS", "1")
+    monkeypatch.setenv("DEMO_RESET_TOKEN", "demo-reset-secret")
+
+    unauthorized = client.post("/demo-support/reset")
+    assert unauthorized.status_code == 403
+    assert unauthorized.json()["detail"] == "Invalid demo reset token"
+
+    reset = client.post("/demo-support/reset", headers={"x-demo-reset-token": "demo-reset-secret"})
+    assert reset.status_code == 200
+    assert reset.json() == {"status": "ok", "mode": "demo-reset"}
+
+    shifts = client.get("/employees/E001/shifts", headers=auth_headers())
+    assert shifts.status_code == 200
+    assert shifts.json()["shifts"] == []
+
+    leave_requests = client.get("/employees/E001/leave-requests", headers=auth_headers())
+    assert leave_requests.status_code == 200
+    assert leave_requests.json()["leave_requests"] == []
+
+
+def test_bootstrap_application_state_can_force_a_clean_demo_start(monkeypatch) -> None:
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+
+    monkeypatch.setenv("RESET_DATABASE_ON_STARTUP", "1")
+    bootstrap_application_state()
+
+    shifts = client.get("/employees/E001/shifts", headers=auth_headers())
+    assert shifts.status_code == 200
+    assert shifts.json()["shifts"] == []
+
+    policies = client.get("/policies", headers=auth_headers())
+    assert policies.status_code == 200
+    assert policies.json()["policies"]["minimum_break_minutes"] == 30

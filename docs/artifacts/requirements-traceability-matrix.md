@@ -1,6 +1,6 @@
 # Requirements Traceability Matrix
 
-Date: 2026-05-14
+Date: 2026-05-15
 Story Source: docs/artifacts/product-stories.md
 Status Legend: Implemented, Partial, Not Started
 
@@ -9,7 +9,7 @@ Status Legend: Implemented, Partial, Not Started
 | Workforce Time Management | WTM-1 | Employee Clock-In | API + UI | POST /employees/{employee_id}/clock-in and frontend punch flow | API tests + Playwright | Implemented |
 | Workforce Time Management | WTM-2 | Employee Clock-Out | API + UI | POST /employees/{employee_id}/clock-out and frontend punch flow | API tests + Playwright | Implemented |
 | Workforce Time Management | WTM-3 | Web Punch Management | API + UI | Browser-based punch controls backed by clock endpoints | Playwright | Implemented |
-| Workforce Time Management | WTM-4 | Mobile-Friendly Punch Workflows | API + UI | Responsive frontend and mobile viewport punch flow | Playwright mobile | Implemented |
+| Workforce Time Management | WTM-4 | Mobile-Friendly Punch Workflows | API + UI | Responsive frontend reuses the same punch workflow on smaller viewports and mobile browsers | Code review + Playwright mobile baseline | Implemented |
 | Workforce Time Management | WTM-5 | Punch Validation | API | Employee ID validation, duplicate clock-in rejection, no-open-shift clock-out rejection | API tests | Implemented |
 | Workforce Time Management | WTM-6 | Missing Punch Detection | API + UI | GET /employees/{employee_id}/missing-punch-exceptions and exceptions card in frontend | API tests + UI | Implemented |
 | Workforce Time Management | WTM-7 | Attendance Tracking | API + UI | GET /employees/{employee_id}/shifts, GET /employees/{employee_id}/payroll-summary, and diagnostics read models | API tests + Playwright | Implemented |
@@ -37,7 +37,7 @@ Status Legend: Implemented, Partial, Not Started
 | Compliance and Reporting | CR-5 | Operational Reporting | API only | GET /reports/operational and GET /ops/diagnostics | API tests | Implemented |
 | Compliance and Reporting | CR-6 | CrossCheck Reporting | API only | GET /reports/crosscheck | API tests | Implemented |
 | Mobile Workforce Support | MWS-1 | Mobile-Friendly Workflows | UI | Responsive time-capture console | Playwright mobile | Implemented |
-| Mobile Workforce Support | MWS-2 | Mobile Punch Support | API + UI | Mobile browser punch flow using the same API contracts | Playwright mobile | Implemented |
+| Mobile Workforce Support | MWS-2 | Mobile Punch Support | API + UI | Mobile browsers use the same punch controls and API contracts as desktop, with responsive/mobile coverage in the current UI | Code review + Playwright mobile baseline | Implemented |
 | Mobile Workforce Support | MWS-3 | Responsive UI Behavior | UI | Frontend responsive layout and controls | Playwright mobile | Implemented |
 | Mobile Workforce Support | MWS-4 | Device Accessibility Support | UI | Skip link, accessible names, status live region, keyboard flow, and landmark coverage | Playwright accessibility | Implemented |
 | Enterprise Readiness | ENT-1 | Multi-Company Workflows | API only | GET /companies/{company_id}/employees and company-scoped payroll endpoints | API tests | Implemented |
@@ -70,10 +70,16 @@ Status Legend: Implemented, Partial, Not Started
 ## Remaining Gaps (Exact)
 
 - ENT-5 and TAR-5 remain partial because local development still defaults to file-backed SQLite and request counters remain instance-local even though workflow and policy state are durable.
+- TAR-4 remains partial because the contract surface is broad but extension seams are still lightweight and mostly documented by convention rather than dedicated extension boundaries.
+- TAR-8 remains partial because the repo now has a reference-only secret-provider stub, but no dedicated secret-management integration is present.
+- TAR-11 remains partial because the auth boundary is still a demo bearer-token stub rather than real JWT, OIDC, or CIAM integration.
+- TAR-12 remains partial because integration readiness now includes a configurable notification stub, but not a concrete downstream system adapter.
 - TAR-13 is not started because no event-driven integration contract exists yet.
+- TAR-14 remains partial because the repo is container-ready and observable, but cloud-native runtime posture is still limited by local SQLite defaults, instance-local counters, and missing downstream operations integration.
 
 ## Notes On Delivery Surface
 
 - Functional breadth is strongest at the API layer.
-- The frontend currently covers time capture, leave and scheduling basics, payroll detail, compliance reporting basics, missing-punch visibility, and accessibility/mobile baselines.
-- Enterprise admin workflows and broader operational/company reporting remain API-only.
+- The frontend currently covers time capture, leave and scheduling basics, payroll detail, compliance reporting basics, enterprise admin directory/location visibility, policy editing, employee location reassignment, stub notification/secret configuration, operational/crosscheck/export summaries, missing-punch visibility, and accessibility/mobile baselines.
+- Deeper enterprise admin actions, richer reporting drill-downs, and real downstream integrations still remain API-first or stubbed.
+- Evidence re-verified on 2026-05-15: API suite passed 43 tests, including direct repository logic coverage, company-admin stub coverage, and a gated compose smoke test; Playwright passed 12 tests across 7 spec files; frontend unit tests passed 3 tests.

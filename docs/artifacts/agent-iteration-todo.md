@@ -17,8 +17,9 @@ Source prompts folder: .github/prompts
 
 ## Current Evidence Snapshot
 
-- API suite: 37 passed
-- Playwright suite: 7 passed
+- API suite: 42 passed
+- Playwright suite: 12 passed
+- Frontend unit suite: 3 passed
 - Backend coverage: 90%
 
 ## Current Interpretation

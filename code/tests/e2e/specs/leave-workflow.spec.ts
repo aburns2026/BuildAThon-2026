@@ -1,24 +1,34 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { resetDemoState } from "./support";
+
+const leaveStartDate = "2026-06-03";
+const leaveEndDate = "2026-06-04";
+
 async function submitLeave(page: Page, startDate: string, endDate: string) {
   await page.getByLabel("Leave start date").fill(startDate);
   await page.getByLabel("Leave end date").fill(endDate);
   await page.getByRole("button", { name: "Submit Leave Request" }).click();
 }
 
+test.beforeEach(async ({ request }) => {
+  await resetDemoState(request);
+});
+
 test("Leave workflow: employee submits request and manager approval updates balance", async ({ page }) => {
   await page.goto("/");
 
-  await submitLeave(page, "2026-05-20", "2026-05-21");
+  await submitLeave(page, leaveStartDate, leaveEndDate);
   await expect(page.locator("p.message")).toContainText("Leave request created");
 
   const leaveCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Leave Workflow" }) });
-  await expect(leaveCard.getByText("PENDING", { exact: true }).first()).toBeVisible();
-  await expect(leaveCard.locator("li").filter({ hasText: "2026-05-20 to 2026-05-21" }).first()).toBeVisible();
+  const requestRow = leaveCard.locator("li").filter({ hasText: `${leaveStartDate} to ${leaveEndDate}` });
+  await expect(requestRow).toHaveCount(1);
+  await expect(requestRow.first()).toContainText("PENDING");
 
-  await leaveCard.getByRole("button", { name: "Approve Leave Request" }).first().click();
+  await requestRow.getByRole("button", { name: "Approve Leave Request" }).click();
   await expect(page.locator("p.message")).toContainText("Leave request approved");
-  await expect(leaveCard.getByText("APPROVED", { exact: true }).first()).toBeVisible();
-  await expect(leaveCard.getByText("Used Days")).toBeVisible();
-  await expect(leaveCard.getByText("1").first()).toBeVisible();
+  await expect(requestRow).toContainText("APPROVED");
+  await expect(requestRow).not.toContainText("Approve Leave Request");
+  await expect(leaveCard.locator(".leave-summary dd").nth(1)).toHaveText("1");
 });

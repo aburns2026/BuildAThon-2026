@@ -1,10 +1,8 @@
-from fastapi.testclient import TestClient
 from datetime import UTC, datetime, timedelta
-from sqlalchemy import desc
+from fastapi.testclient import TestClient
 
-from backend.db import SessionLocal
+import backend.main as main
 from backend.main import app
-from backend.models import Shift
 
 
 client = TestClient(app)
@@ -30,7 +28,7 @@ def test_clock_in_success() -> None:
 
 def test_duplicate_clock_in_rejected() -> None:
     first = client.post("/employees/E001/clock-in", headers=auth_headers())
-    assert first.status_code in (200, 409)
+    assert first.status_code == 200
 
     response = client.post("/employees/E001/clock-in", headers=auth_headers())
 
@@ -39,8 +37,8 @@ def test_duplicate_clock_in_rejected() -> None:
 
 
 def test_clock_out_success_after_open_shift() -> None:
-    maybe_open = client.post("/employees/E001/clock-in", headers=auth_headers())
-    assert maybe_open.status_code in (200, 409)
+    opened = client.post("/employees/E001/clock-in", headers=auth_headers())
+    assert opened.status_code == 200
 
     response = client.post("/employees/E001/clock-out", headers=auth_headers())
 
@@ -118,21 +116,12 @@ def test_missing_punch_exceptions_empty_for_recent_open_shift() -> None:
     assert body["exceptions"] == []
 
 
-def test_missing_punch_exceptions_flag_for_old_open_shift() -> None:
+def test_missing_punch_exceptions_flag_for_old_open_shift(monkeypatch) -> None:
+    started_at = datetime(2026, 5, 15, 9, 0, tzinfo=UTC)
+    monkeypatch.setattr(main, "utc_now", lambda: started_at)
     assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
-    db = SessionLocal()
-    try:
-        shift = (
-            db.query(Shift)
-            .filter(Shift.employee_id == "E001", Shift.state == "OPEN")
-            .order_by(desc(Shift.start_at))
-            .first()
-        )
-        assert shift is not None
-        shift.start_at = datetime.now(UTC) - timedelta(minutes=120)
-        db.commit()
-    finally:
-        db.close()
+
+    monkeypatch.setattr(main, "utc_now", lambda: started_at + timedelta(minutes=120))
 
     response = client.get(
         "/employees/E001/missing-punch-exceptions",

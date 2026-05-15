@@ -31,7 +31,7 @@ body {
 }
 
 .page {
-  max-width: 980px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 2rem 1rem 3rem;
   display: grid;
@@ -98,6 +98,16 @@ input {
   font: inherit;
 }
 
+select {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.2);
+  border-radius: 10px;
+  padding: 0.7rem 0.8rem;
+  background: rgba(255, 255, 255, 0.96);
+  color: #0f172a;
+  font: inherit;
+}
+
 button.secondary {
   background: #0f172a;
 }
@@ -128,6 +138,12 @@ h2 {
   margin-top: 0;
   margin-bottom: 0.6rem;
   font-size: 1.05rem;
+}
+
+h3 {
+  margin-top: 0;
+  margin-bottom: 0.6rem;
+  font-size: 0.98rem;
 }
 
 .list {
@@ -180,6 +196,66 @@ h2 {
 .scheduling-card {
   display: grid;
   gap: 1rem;
+}
+
+.admin-card,
+.reporting-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-stack,
+.reporting-stack {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.nested-card {
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.nested-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.nested-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.checkbox-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.checkbox-row input {
+  width: auto;
+  margin: 0;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.helper-copy {
+  margin: 0.75rem 0 0;
+  color: #475569;
+  font-size: 0.92rem;
+}
+
+.operational-summary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.inline-status {
+  margin: 0;
 }
 
 .leave-form {
@@ -300,6 +376,10 @@ h2 {
   .schedule-form,
   .schedule-policy-summary {
     grid-template-columns: 1fr;
+  }
+
+  .inline-actions {
+    flex-direction: column;
   }
 
   .compliance-summary,

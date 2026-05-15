@@ -1,6 +1,6 @@
 # Acceptance Criteria (Current State)
 
-Date: 2026-05-14
+Date: 2026-05-15
 Source alignment:
 
 - docs/bbsi_buildathon_2026_requirements_only.md sections 4 and 5
@@ -34,7 +34,7 @@ Source alignment:
 ## Compliance, Reporting, and Enterprise Controls
 
 - Given attendance exception and audit data, when operational or crosscheck reports are requested, then the service returns deterministic aggregate or reconciliation output.
-- Given a compliance report request, when the endpoint is called, then the response returns validation-status fields and attendance exception count.
+- Given a compliance report request, when the endpoint is called, then the response returns tax and labor validation results, rolled-up statuses, and attendance exception count.
 - Given protected endpoints, when authorization headers are missing or invalid, then the request is rejected safely.
 - Given company-scoped endpoints, when the company claim is missing or mismatched, then the request is rejected safely.
 - Given policy changes, when a non-admin caller attempts to patch policies, then the request is rejected.
@@ -42,5 +42,5 @@ Source alignment:
 ## Technical Requirement Acceptance Criteria
 
 - Given web and mobile browser clients, when they call the backend, then the workflow contracts are API-backed and reusable across clients.
-- Given current runtime posture, when health or diagnostics are requested, then baseline operational endpoints respond successfully.
-- Given current architecture, when delivery claims are reviewed, then remaining gaps are explicit: real compliance logic, durable state for selected in-memory collections, container packaging, and logging/monitoring support.
+- Given current runtime posture, when health, diagnostics, or metrics are requested, then baseline operational endpoints respond successfully.
+- Given current architecture, when delivery claims are reviewed, then remaining gaps are explicit: demo-only authentication, local SQLite development defaults, instance-local telemetry counters, minimal downstream alert routing, no dedicated secret-management integration, and no event-driven integration contract.

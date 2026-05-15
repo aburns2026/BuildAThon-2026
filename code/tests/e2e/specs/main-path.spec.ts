@@ -1,7 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
+
+import { resetDemoState } from "./support";
 
 const runId = process.env.PW_RUN_ID ?? new Date().toISOString().replace(/[:.]/g, "-");
 const archiveDir = path.resolve(
@@ -9,10 +11,6 @@ const archiveDir = path.resolve(
   "../../../../artifacts/playwright-runs",
   runId
 );
-const authHeader = {
-  Authorization: `Bearer ${process.env.PW_DEMO_AUTH_TOKEN ?? "demo-employee-token"}`,
-};
-
 async function saveStepScreenshot(page: Page, testInfo: TestInfo, fileName: string) {
   const testOutputPath = testInfo.outputPath(fileName);
   await page.screenshot({ path: testOutputPath, fullPage: true });
@@ -22,17 +20,11 @@ async function saveStepScreenshot(page: Page, testInfo: TestInfo, fileName: stri
   fs.copyFileSync(testOutputPath, archivePath);
 }
 
-async function ensureNoOpenShift(request: APIRequestContext) {
-  const response = await request.post("http://127.0.0.1:8000/employees/E001/clock-out", {
-    headers: authHeader,
-  });
-  if (![200, 409].includes(response.status())) {
-    throw new Error(`Unexpected preflight clock-out status: ${response.status()}`);
-  }
-}
+test.beforeEach(async ({ request }) => {
+  await resetDemoState(request);
+});
 
-test("MVP flow: clock in, duplicate validation, clock out, and summary visibility", async ({ page, request }, testInfo) => {
-  await ensureNoOpenShift(request);
+test("MVP flow: clock in, duplicate validation, clock out, and summary visibility", async ({ page }, testInfo) => {
   await page.goto("/");
   await saveStepScreenshot(page, testInfo, "01-home.png");
 
@@ -52,11 +44,13 @@ test("MVP flow: clock in, duplicate validation, clock out, and summary visibilit
 
   const shiftHistoryCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Shift History" }) });
   await expect(shiftHistoryCard.getByRole("heading", { name: "Shift History" })).toBeVisible();
-  await expect(shiftHistoryCard.getByText("CLOSED", { exact: true }).first()).toBeVisible();
+  const shiftRows = shiftHistoryCard.locator("li");
+  await expect(shiftRows).toHaveCount(1);
+  await expect(shiftRows.first()).toContainText("CLOSED");
 
   const summaryCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Payroll Summary" }) });
   await expect(summaryCard.getByRole("heading", { name: "Payroll Summary" })).toBeVisible();
-  await expect(summaryCard.getByText("Closed Shifts", { exact: false })).toBeVisible();
+  await expect(summaryCard.locator("dd").nth(1)).toHaveText("1");
 
   const breakdownCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Payroll Breakdown" }) });
   await expect(breakdownCard.getByRole("heading", { name: "Payroll Breakdown" })).toBeVisible();
@@ -64,11 +58,16 @@ test("MVP flow: clock in, duplicate validation, clock out, and summary visibilit
 
   const complianceCard = page.locator("article.card").filter({ has: page.getByRole("heading", { name: "Compliance Report" }) });
   await expect(complianceCard.getByRole("heading", { name: "Compliance Report" })).toBeVisible();
-  await expect(complianceCard.getByText("Tax Validation Status", { exact: false })).toBeVisible();
-  await expect(complianceCard.getByText("PASS", { exact: true }).first()).toBeVisible();
+  await expect(complianceCard.getByText("EMPLOYEE ORG ASSIGNMENT PRESENT", { exact: false })).toBeVisible();
+  await expect(complianceCard.getByText("NO OPEN SHIFT PENDING", { exact: false })).toBeVisible();
+  await expect(complianceCard.locator(".status-pill.pass").first()).toBeVisible();
 
   const auditCard = page.locator("section.card").filter({ has: page.getByRole("heading", { name: "Audit Events" }) });
   await expect(auditCard.getByRole("heading", { name: "Audit Events" })).toBeVisible();
-  await expect(auditCard.getByText("CLOCK_OUT_ACCEPTED", { exact: false }).first()).toBeVisible();
+  const auditRows = auditCard.locator("li");
+  await expect(auditRows).toHaveCount(3);
+  await expect(auditRows.nth(0)).toContainText("CLOCK_OUT_ACCEPTED");
+  await expect(auditRows.nth(1)).toContainText("CLOCK_IN_REJECTED");
+  await expect(auditRows.nth(2)).toContainText("CLOCK_IN_ACCEPTED");
   await saveStepScreenshot(page, testInfo, "05-final-state.png");
 });

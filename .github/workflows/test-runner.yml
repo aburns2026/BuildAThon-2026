@@ -1,0 +1,45 @@
+name: test_runner
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-runner:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r code/backend/requirements.txt
+
+      - name: Install frontend dependencies
+        run: cd code/frontend && npm ci
+
+      - name: Install e2e dependencies
+        run: cd code/tests/e2e && npm ci
+
+      - name: Install Playwright browser
+        run: cd code/tests/e2e && npx playwright install --with-deps chromium
+
+      - name: Run test_runner
+        run: |
+          chmod +x scripts/test_runner.sh
+          PYTHON_BIN=python ./scripts/test_runner.sh

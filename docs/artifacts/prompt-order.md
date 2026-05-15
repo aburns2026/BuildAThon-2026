@@ -63,6 +63,8 @@ This file tracks the execution order for BuildAThon prompts and the activities t
 - demo-ready checklist: docs/artifacts/demo-ready-checklist.md
 - support triage plan: docs/artifacts/support-triage-plan.md
 - bugbot defect report: docs/artifacts/bugbot-defect-report.md
+- frontend unit tests: code/frontend/src/App.test.tsx
+- enterprise/reporting UI coverage: code/tests/e2e/specs/admin-reporting.spec.ts
 
 ## Update Rules
 
@@ -158,3 +160,21 @@ Use this log after each step:
 - Status change: Completed -> Completed (endpoint authorization expanded)
 - Artifacts or evidence: code/backend/main.py, code/tests/api/test_phase2_contracts.py, code/tests/api/test_expansion_contracts.py
 - Notes/blockers: Added endpoint-level `X-Role` authorization checks on protected routes (leave approval, scheduling, policy updates, payroll export/integration, reports, balance adjustments); API tests passing (27 passed).
+
+- Date: 2026-05-15
+- Step: 4 QA/STE prompt (post-review hardening refresh)
+- Status change: Completed -> Completed (test hardening expanded)
+- Artifacts or evidence: code/tests/e2e/playwright.config.ts, code/tests/e2e/specs/support.ts, code/tests/e2e/specs/negative-paths.spec.ts, code/tests/e2e/specs/admin-reporting.spec.ts, code/tests/api/test_repository_logic.py, code/tests/api/test_compose_smoke.py
+- Notes/blockers: Added isolated Playwright reset support, stronger E2E assertions, negative-path browser coverage, direct repository logic tests, and a gated compose smoke test; evidence now API 42 passed, Playwright 12 passed, frontend unit 3 passed.
+
+- Date: 2026-05-15
+- Step: 3 Developer prompt (post-review UI expansion)
+- Status change: Completed -> Completed (frontend coverage expanded)
+- Artifacts or evidence: code/frontend/src/App.tsx, code/frontend/src/App.test.tsx, code/frontend/README.md, docs/artifacts/planning-framework.md, docs/artifacts/roadmap.md
+- Notes/blockers: Added enterprise admin directory/location views plus operational, crosscheck, and payroll export summaries in the React UI, and established a small Vitest/Testing Library baseline for frontend correctness.
+
+- Date: 2026-05-15
+- Step: 3 Developer prompt (simple enterprise admin hardening)
+- Status change: Completed -> Completed (editable admin workflows added)
+- Artifacts or evidence: code/backend/main.py, code/backend/models.py, code/frontend/src/App.tsx, code/tests/api/test_phase2_contracts.py, code/tests/e2e/specs/admin-reporting.spec.ts
+- Notes/blockers: Added editable policy and employee-location management in the UI, plus stubbed downstream notification and secret-provider configuration surfaces. Final validation: API 43 passed, Playwright 12 passed, frontend unit 3 passed. Real downstream delivery and real secret backends still remain out of scope.

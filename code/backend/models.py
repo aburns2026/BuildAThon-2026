@@ -95,3 +95,26 @@ class PolicySetting(Base):
 
     policy_key: Mapped[str] = mapped_column(String(64), primary_key=True)
     int_value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class NotificationEndpoint(Base):
+    __tablename__ = "notification_endpoints"
+
+    company_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    destination_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    target: Mapped[str] = mapped_column(String(255), nullable=False)
+    secret_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    enabled: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    last_tested_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SecretProviderConfig(Base):
+    __tablename__ = "secret_provider_configs"
+
+    company_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(64), nullable=False)
+    reference_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    enabled: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)

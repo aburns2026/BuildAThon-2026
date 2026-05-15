@@ -1,11 +1,9 @@
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
-from sqlalchemy import desc
 
-from backend.db import SessionLocal
+import backend.main as main
 from backend.main import app
-from backend.models import Shift
 
 
 client = TestClient(app)
@@ -18,23 +16,22 @@ def auth_headers(token: str = "demo-employee-token", extra: dict[str, str] | Non
     return headers
 
 
-def _create_closed_shift(duration_minutes: int = 600, start_hour_utc: int = 9) -> None:
+def _create_closed_shift_at(monkeypatch, start_at: datetime, duration_minutes: int) -> None:
+    ended_at = start_at + timedelta(minutes=duration_minutes)
+
+    monkeypatch.setattr(main, "utc_now", lambda: start_at)
     assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
-    db = SessionLocal()
-    try:
-        shift = (
-            db.query(Shift)
-            .filter(Shift.employee_id == "E001", Shift.state == "OPEN")
-            .order_by(desc(Shift.start_at))
-            .first()
-        )
-        assert shift is not None
-        start_dt = datetime.now(UTC).replace(hour=start_hour_utc, minute=0, second=0, microsecond=0)
-        shift.start_at = start_dt - timedelta(minutes=duration_minutes)
-        db.commit()
-    finally:
-        db.close()
+
+    monkeypatch.setattr(main, "utc_now", lambda: ended_at)
     assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
+
+
+def _create_closed_shift(monkeypatch, duration_minutes: int = 600, start_hour_utc: int = 9) -> None:
+    _create_closed_shift_at(
+        monkeypatch,
+        datetime(2026, 5, 15, start_hour_utc, 0, tzinfo=UTC),
+        duration_minutes,
+    )
 
 
 def test_schedule_shift_hard_enforces_break_and_core_hour_policies() -> None:
@@ -67,8 +64,8 @@ def test_schedule_shift_hard_enforces_break_and_core_hour_policies() -> None:
     assert exceptions.json()["exceptions"] == []
 
 
-def test_timesheet_contract_and_period_validation() -> None:
-    _create_closed_shift(duration_minutes=120)
+def test_timesheet_contract_and_period_validation(monkeypatch) -> None:
+    _create_closed_shift(monkeypatch, duration_minutes=120)
 
     timesheet = client.get(
         "/employees/E001/timesheets",
@@ -78,7 +75,10 @@ def test_timesheet_contract_and_period_validation() -> None:
     assert timesheet.status_code == 200
     body = timesheet.json()
     assert body["employee_id"] == "E001"
-    assert body["total_minutes"] >= 0
+    assert body["total_minutes"] == 120
+    assert len(body["entries"]) == 1
+    assert body["entries"][0]["minutes"] == 120
+    assert body["entries"][0]["date"] == "2026-05-15"
 
     invalid = client.get(
         "/employees/E001/timesheets",
@@ -101,8 +101,8 @@ def test_pto_balance_and_adjustment() -> None:
     assert balance.json()["total_days"] == 22
 
 
-def test_comp_time_balance_and_adjustment() -> None:
-    _create_closed_shift(duration_minutes=540)
+def test_comp_time_balance_and_adjustment(monkeypatch) -> None:
+    _create_closed_shift(monkeypatch, duration_minutes=540)
 
     adjusted = client.post(
         "/employees/E001/comp-time-adjustments",
@@ -113,11 +113,41 @@ def test_comp_time_balance_and_adjustment() -> None:
 
     balance = client.get("/employees/E001/comp-time-balance", headers=auth_headers())
     assert balance.status_code == 200
-    assert balance.json()["total_comp_time_minutes"] >= 90
+    body = balance.json()
+    assert body["accrued_from_overtime_minutes"] == 60
+    assert body["manual_adjustment_minutes"] == 30
+    assert body["total_comp_time_minutes"] == 90
 
 
-def test_payroll_export_and_integration_payload() -> None:
-    _create_closed_shift(duration_minutes=120)
+def test_balance_adjustments_validate_non_zero_values_and_reason() -> None:
+    invalid_pto = client.post(
+        "/employees/E001/pto-adjustments",
+        json={"days_delta": 0},
+        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
+    )
+    assert invalid_pto.status_code == 422
+    assert invalid_pto.json()["detail"] == "days_delta cannot be 0"
+
+    invalid_comp = client.post(
+        "/employees/E001/comp-time-adjustments",
+        json={"minutes_delta": 0, "reason": ""},
+        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
+    )
+    assert invalid_comp.status_code == 422
+    assert invalid_comp.json()["detail"] == "minutes_delta cannot be 0"
+
+    missing_reason = client.post(
+        "/employees/E001/comp-time-adjustments",
+        json={"minutes_delta": 15, "reason": ""},
+        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
+    )
+    assert missing_reason.status_code == 422
+    assert missing_reason.json()["detail"] == "reason is required"
+
+
+def test_payroll_export_and_integration_payload(monkeypatch) -> None:
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 9, 0, tzinfo=UTC), 600)
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 16, 23, 0, tzinfo=UTC), 120)
 
     forbidden = client.get("/companies/COMP-001/payroll-export")
     assert forbidden.status_code == 401
@@ -131,17 +161,33 @@ def test_payroll_export_and_integration_payload() -> None:
     export_body = export_res.json()
     assert export_body["company_id"] == "COMP-001"
     assert export_body["status"] == "READY"
+    assert export_body["period_start"] == "2026-01-01"
+    assert export_body["period_end"] == "2026-12-31"
+    assert export_body["row_count"] == 1
+    assert export_body["rows"] == [
+        {
+            "employee_id": "E001",
+            "location_id": "LOC-001",
+            "total_minutes_worked": 720,
+            "overtime_minutes": 120,
+            "holiday_minutes": 120,
+            "night_shift_minutes": 120,
+        }
+    ]
 
     integration = client.get(
         "/companies/COMP-001/payroll-integration-payload",
         headers=auth_headers("demo-payroll-token", {"x-role": "PAYROLL", "x-company-id": "COMP-001"}),
     )
     assert integration.status_code == 200
-    assert integration.json()["schema_version"] == "1.0"
+    integration_body = integration.json()
+    assert integration_body["schema_version"] == "1.0"
+    assert integration_body["destination"] == "future-payroll-integration"
+    assert integration_body["employees"] == export_body["rows"]
 
 
-def test_location_scoped_endpoints() -> None:
-    _create_closed_shift(duration_minutes=120)
+def test_location_scoped_endpoints(monkeypatch) -> None:
+    _create_closed_shift(monkeypatch, duration_minutes=120)
 
     locations = client.get("/companies/COMP-001/locations", headers=auth_headers())
     assert locations.status_code == 200
@@ -172,17 +218,33 @@ def test_location_scoped_endpoints() -> None:
     body = allowed.json()
     assert body["location_id"] == "LOC-001"
     assert body["status"] == "READY"
+    assert body["row_count"] == 1
+    assert body["rows"] == [
+        {
+            "employee_id": "E001",
+            "location_id": "LOC-001",
+            "total_minutes_worked": 120,
+            "overtime_minutes": 0,
+            "holiday_minutes": 0,
+            "night_shift_minutes": 0,
+        }
+    ]
 
 
-def test_operational_and_crosscheck_reports() -> None:
-    _create_closed_shift(duration_minutes=120)
+def test_operational_and_crosscheck_reports(monkeypatch) -> None:
+    _create_closed_shift(monkeypatch, duration_minutes=120)
 
     report = client.get(
         "/reports/operational",
         headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
     )
     assert report.status_code == 200
-    assert "event_count" in report.json()
+    report_body = report.json()
+    assert report_body["event_count"] == 2
+    assert report_body["accepted_event_count"] == 2
+    assert report_body["rejected_event_count"] == 0
+    assert report_body["open_shift_count"] == 0
+    assert report_body["closed_shift_count"] == 1
 
     crosscheck = client.get(
         "/reports/crosscheck",
@@ -190,7 +252,10 @@ def test_operational_and_crosscheck_reports() -> None:
         headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
     )
     assert crosscheck.status_code == 200
-    assert crosscheck.json()["status"] in {"MATCH", "MISMATCH"}
+    crosscheck_body = crosscheck.json()
+    assert crosscheck_body["status"] == "MATCH"
+    assert crosscheck_body["payroll_summary_total_minutes"] == 120
+    assert crosscheck_body["derived_shift_total_minutes"] == 120
 
 
 def test_policy_config_and_authz_check() -> None:
@@ -225,21 +290,59 @@ def test_policy_config_and_authz_check() -> None:
     assert deny.json()["allowed"] is False
 
 
-def test_compliance_report_fails_for_missing_punch_and_long_shift() -> None:
+def test_company_admin_workflows_cover_location_notifications_and_secret_stubs() -> None:
+    reassigned = client.patch(
+        "/companies/COMP-001/employees/E001",
+        json={"location_id": "LOC-002"},
+        headers=auth_headers("demo-admin-token", {"x-role": "ADMIN", "x-company-id": "COMP-001"}),
+    )
+    assert reassigned.status_code == 200
+    assert reassigned.json()["location_id"] == "LOC-002"
+
+    locations = client.get("/companies/COMP-001/locations", headers=auth_headers())
+    assert locations.status_code == 200
+    assert locations.json()["locations"] == [{"location_id": "LOC-002", "employee_count": 1}]
+
+    notification_settings = client.put(
+        "/companies/COMP-001/notification-settings",
+        json={
+            "destination_type": "WEBHOOK",
+            "target": "https://example.invalid/buildathon-webhook",
+            "secret_reference": "ops/buildathon/webhook-token",
+            "enabled": True,
+        },
+        headers=auth_headers("demo-admin-token", {"x-role": "ADMIN", "x-company-id": "COMP-001"}),
+    )
+    assert notification_settings.status_code == 200
+    notification_body = notification_settings.json()
+    assert notification_body["status"] == "CONFIGURED"
+    assert notification_body["delivery_mode"] == "STUB"
+
+    notification_test = client.post(
+        "/companies/COMP-001/notification-settings/test",
+        headers=auth_headers("demo-admin-token", {"x-role": "ADMIN", "x-company-id": "COMP-001"}),
+    )
+    assert notification_test.status_code == 200
+    assert notification_test.json()["status"] == "TEST_DELIVERY_SIMULATED"
+
+    secret_provider = client.put(
+        "/companies/COMP-001/secret-provider",
+        json={"provider": "VAULT_STUB", "reference_name": "kv/buildathon/payroll", "enabled": True},
+        headers=auth_headers("demo-admin-token", {"x-role": "ADMIN", "x-company-id": "COMP-001"}),
+    )
+    assert secret_provider.status_code == 200
+    secret_body = secret_provider.json()
+    assert secret_body["provider"] == "VAULT_STUB"
+    assert secret_body["status"] == "CONFIGURED"
+    assert secret_body["stores_secret_material"] is False
+
+
+def test_compliance_report_fails_for_missing_punch_and_long_shift(monkeypatch) -> None:
+    started_at = datetime(2026, 5, 15, 9, 0, tzinfo=UTC)
+    monkeypatch.setattr(main, "utc_now", lambda: started_at)
     assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
-    db = SessionLocal()
-    try:
-        shift = (
-            db.query(Shift)
-            .filter(Shift.employee_id == "E001", Shift.state == "OPEN")
-            .order_by(desc(Shift.start_at))
-            .first()
-        )
-        assert shift is not None
-        shift.start_at = datetime.now(UTC) - timedelta(minutes=780)
-        db.commit()
-    finally:
-        db.close()
+
+    monkeypatch.setattr(main, "utc_now", lambda: started_at + timedelta(minutes=780))
 
     response = client.get("/employees/E001/compliance-report", headers=auth_headers())
 

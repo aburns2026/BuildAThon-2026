@@ -1,3 +1,4 @@
+import os
 from datetime import UTC, datetime
 from datetime import date as date_cls
 import logging
@@ -11,8 +12,8 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy.orm import Session
 
 try:
-    from .db import get_database_health, get_database_runtime_info, get_db, init_db
-    from .models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, PolicySetting, PtoAdjustment, ScheduledShift, Shift, TimeCorrection
+    from .db import Base, SessionLocal, engine, get_database_health, get_database_runtime_info, get_db, init_db
+    from .models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, NotificationEndpoint, PolicySetting, PtoAdjustment, ScheduledShift, SecretProviderConfig, Shift, TimeCorrection
     from .repositories import (
         add_audit_event,
         comp_time_adjustment_to_dict,
@@ -29,8 +30,8 @@ try:
         utc_now_iso,
     )
 except ImportError:
-    from db import get_database_health, get_database_runtime_info, get_db, init_db
-    from models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, PolicySetting, PtoAdjustment, ScheduledShift, Shift, TimeCorrection
+    from db import Base, SessionLocal, engine, get_database_health, get_database_runtime_info, get_db, init_db
+    from models import AuditEvent, CompTimeAdjustment, Employee, LeaveRequest, NotificationEndpoint, PolicySetting, PtoAdjustment, ScheduledShift, SecretProviderConfig, Shift, TimeCorrection
     from repositories import (
         add_audit_event,
         comp_time_adjustment_to_dict,
@@ -51,6 +52,9 @@ except ImportError:
 EMPLOYEE_ID_PATTERN = re.compile(r"^E[0-9]{3,10}$")
 LOG_LEVEL = "INFO"
 REQUEST_ID_HEADER = "x-request-id"
+TEST_SUPPORT_TOKEN_HEADER = "x-test-support-token"
+TEST_SUPPORT_TOKEN = os.getenv("TEST_SUPPORT_TOKEN", "buildathon-e2e")
+DEMO_RESET_TOKEN_HEADER = "x-demo-reset-token"
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -60,14 +64,18 @@ if not logging.getLogger().handlers:
 
 logger = logging.getLogger("buildathon.api")
 APP_STARTED_AT = utc_now()
-REQUEST_METRICS: dict[str, object] = {
-    "request_count_total": 0,
-    "request_error_count": 0,
-    "request_duration_ms_sum": 0,
-    "request_duration_ms_max": 0,
-    "requests_by_path": {},
-    "requests_by_status": {},
-}
+def _new_request_metrics() -> dict[str, object]:
+    return {
+        "request_count_total": 0,
+        "request_error_count": 0,
+        "request_duration_ms_sum": 0,
+        "request_duration_ms_max": 0,
+        "requests_by_path": {},
+        "requests_by_status": {},
+    }
+
+
+REQUEST_METRICS: dict[str, object] = _new_request_metrics()
 
 ROLE_PERMISSIONS: dict[str, set[str]] = {
     "EMPLOYEE": {"clock_in", "clock_out", "view_self"},
@@ -101,6 +109,9 @@ DEFAULT_POLICY_CONFIG: dict[str, int] = {
     "core_hour_end": 15,
 }
 
+ALLOWED_NOTIFICATION_DESTINATIONS = {"WEBHOOK", "EMAIL", "SLACK_STUB"}
+ALLOWED_SECRET_PROVIDERS = {"ENV", "VAULT_STUB", "KMS_STUB"}
+
 AUTH_PRINCIPALS: dict[str, dict[str, str]] = {
     "demo-employee-token": {"role": "EMPLOYEE", "company_id": "COMP-001"},
     "demo-manager-token": {"role": "MANAGER", "company_id": "COMP-001"},
@@ -113,7 +124,14 @@ AUTH_EXEMPT_PATH_PREFIXES = (
     "/docs",
     "/openapi.json",
     "/redoc",
+    "/demo-support",
+    "/test-support",
 )
+
+ALLOWED_CORS_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
 
 
 def _uptime_seconds() -> int:
@@ -179,6 +197,97 @@ def save_policy_values(db: Session, values: dict[str, int]) -> dict[str, int]:
             item.int_value = value
     db.commit()
     return get_policy_values(db)
+
+
+def _notification_endpoint_to_dict(item: NotificationEndpoint | None, company_id: str) -> dict:
+    if item is None:
+        return {
+            "company_id": company_id,
+            "destination_type": "WEBHOOK",
+            "target": "",
+            "secret_reference": None,
+            "enabled": False,
+            "status": "NOT_CONFIGURED",
+            "last_tested_at": None,
+            "delivery_mode": "STUB",
+        }
+    return {
+        "company_id": item.company_id,
+        "destination_type": item.destination_type,
+        "target": item.target,
+        "secret_reference": item.secret_reference,
+        "enabled": bool(item.enabled),
+        "status": item.status,
+        "last_tested_at": item.last_tested_at.isoformat() if item.last_tested_at else None,
+        "delivery_mode": "STUB",
+    }
+
+
+def _secret_provider_to_dict(item: SecretProviderConfig | None, company_id: str) -> dict:
+    if item is None:
+        return {
+            "company_id": company_id,
+            "provider": "ENV",
+            "reference_name": "",
+            "enabled": False,
+            "status": "NOT_CONFIGURED",
+            "stores_secret_material": False,
+            "updated_at": None,
+        }
+    return {
+        "company_id": item.company_id,
+        "provider": item.provider,
+        "reference_name": item.reference_name,
+        "enabled": bool(item.enabled),
+        "status": item.status,
+        "stores_secret_material": False,
+        "updated_at": item.updated_at.isoformat(),
+    }
+
+
+def reset_application_state() -> None:
+    global REQUEST_METRICS
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    REQUEST_METRICS = _new_request_metrics()
+
+    db = SessionLocal()
+    try:
+        ensure_seed_employee(db)
+        ensure_policy_settings(db)
+    finally:
+        db.close()
+
+
+def test_support_enabled() -> bool:
+    return os.getenv("ENABLE_TEST_SUPPORT_ENDPOINTS", "0") == "1"
+
+
+def demo_reset_enabled() -> bool:
+    return os.getenv("ENABLE_DEMO_RESET_ENDPOINTS", "0") == "1"
+
+
+def demo_reset_on_startup_enabled() -> bool:
+    return os.getenv("RESET_DATABASE_ON_STARTUP", "0") == "1"
+
+
+def demo_reset_token() -> str:
+    return os.getenv("DEMO_RESET_TOKEN", "buildathon-demo-reset")
+
+
+def bootstrap_application_state() -> None:
+    init_db()
+    if demo_reset_on_startup_enabled():
+        reset_application_state()
+        return
+
+    db = next(get_db())
+    try:
+        ensure_seed_employee(db)
+        ensure_policy_settings(db)
+    finally:
+        db.close()
 
 def validate_employee_id_format(employee_id: str) -> None:
     if not EMPLOYEE_ID_PATTERN.match(employee_id):
@@ -393,14 +502,21 @@ def _build_location_payroll_rows(db: Session, company_id: str, location_id: str)
     return rows
 
 
+def cors_json_response(request: Request, *, status_code: int, content: dict) -> JSONResponse:
+    response = JSONResponse(status_code=status_code, content=content)
+    origin = request.headers.get("origin", "").strip()
+    if origin in ALLOWED_CORS_ORIGINS:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+    return response
+
+
 app = FastAPI(title="BuildAThon 2026 Workforce API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=ALLOWED_CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -452,20 +568,40 @@ async def authorization_middleware(request: Request, call_next):
     try:
         request.state.auth_principal = resolve_auth_principal(request)
     except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+        return cors_json_response(request, status_code=exc.status_code, content={"detail": exc.detail})
 
     return await call_next(request)
 
 
 @app.on_event("startup")
 def on_startup() -> None:
-    init_db()
-    db = next(get_db())
-    try:
-        ensure_seed_employee(db)
-        ensure_policy_settings(db)
-    finally:
-        db.close()
+    bootstrap_application_state()
+
+
+@app.post("/demo-support/reset")
+def reset_demo_support_state(request: Request) -> dict:
+    if not demo_reset_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    provided_token = request.headers.get(DEMO_RESET_TOKEN_HEADER, "")
+    if provided_token != demo_reset_token():
+        raise HTTPException(status_code=403, detail="Invalid demo reset token")
+
+    reset_application_state()
+    return {"status": "ok", "mode": "demo-reset"}
+
+
+@app.post("/test-support/reset")
+def reset_test_support_state(request: Request) -> dict:
+    if not test_support_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+
+    provided_token = request.headers.get(TEST_SUPPORT_TOKEN_HEADER, "")
+    if provided_token != TEST_SUPPORT_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid test support token")
+
+    reset_application_state()
+    return {"status": "ok"}
 
 
 @app.get("/health")
@@ -728,6 +864,8 @@ def approve_leave_request(leave_request_id: str, request: Request, db: Session =
     leave_request = db.get(LeaveRequest, leave_request_id)
     if leave_request is None:
         raise HTTPException(status_code=404, detail="Leave request not found")
+    if leave_request.status == "APPROVED":
+        raise HTTPException(status_code=409, detail="Leave request already approved")
     leave_request.status = "APPROVED"
     leave_request.approved_at = utc_now()
     add_audit_event(db, leave_request.employee_id, "LEAVE_REQUEST_APPROVED", "Leave request approved")
@@ -1011,6 +1149,26 @@ def list_company_employees(company_id: str, db: Session = Depends(get_db)) -> di
     }
 
 
+@app.patch("/companies/{company_id}/employees/{employee_id}")
+def update_company_employee(company_id: str, employee_id: str, payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+    employee = db.get(Employee, employee_id)
+    if employee is None or employee.company_id != company_id:
+        raise HTTPException(status_code=404, detail="Employee not found for company")
+
+    location_id = str(payload.get("location_id", "")).strip().upper()
+    if not location_id:
+        raise HTTPException(status_code=422, detail="location_id is required")
+    if len(location_id) > 64:
+        raise HTTPException(status_code=422, detail="location_id exceeds 64 characters")
+
+    employee.location_id = location_id
+    add_audit_event(db, employee.employee_id, "EMPLOYEE_LOCATION_UPDATED", f"Employee moved to {location_id}")
+    db.commit()
+    return {"employee_id": employee.employee_id, "company_id": employee.company_id, "location_id": employee.location_id}
+
+
 @app.get("/companies/{company_id}/locations")
 def list_company_locations(company_id: str, db: Session = Depends(get_db)) -> dict:
     employees = db.query(Employee).filter(Employee.company_id == company_id).all()
@@ -1043,6 +1201,115 @@ def list_location_employees(company_id: str, location_id: str, db: Session = Dep
             for item in employees
         ],
     }
+
+
+@app.get("/companies/{company_id}/notification-settings")
+def get_notification_settings(company_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+    return _notification_endpoint_to_dict(db.get(NotificationEndpoint, company_id), company_id)
+
+
+@app.put("/companies/{company_id}/notification-settings")
+def save_notification_settings(company_id: str, payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+
+    destination_type = str(payload.get("destination_type", "WEBHOOK")).strip().upper()
+    target = str(payload.get("target", "")).strip()
+    secret_reference = str(payload.get("secret_reference", "")).strip() or None
+    enabled = bool(payload.get("enabled", False))
+
+    if destination_type not in ALLOWED_NOTIFICATION_DESTINATIONS:
+        raise HTTPException(status_code=422, detail="destination_type is not supported")
+    if enabled and not target:
+        raise HTTPException(status_code=422, detail="target is required when notifications are enabled")
+
+    item = db.get(NotificationEndpoint, company_id)
+    if item is None:
+        item = NotificationEndpoint(
+            company_id=company_id,
+            destination_type=destination_type,
+            target=target,
+            secret_reference=secret_reference,
+            enabled=1 if enabled else 0,
+            status="CONFIGURED" if enabled else "DISABLED",
+            last_tested_at=None,
+        )
+        db.add(item)
+    else:
+        item.destination_type = destination_type
+        item.target = target
+        item.secret_reference = secret_reference
+        item.enabled = 1 if enabled else 0
+        item.status = "CONFIGURED" if enabled else "DISABLED"
+
+    db.commit()
+    return _notification_endpoint_to_dict(item, company_id)
+
+
+@app.post("/companies/{company_id}/notification-settings/test")
+def test_notification_settings(company_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+    item = db.get(NotificationEndpoint, company_id)
+    if item is None or not bool(item.enabled) or not item.target:
+        raise HTTPException(status_code=409, detail="Notification stub is not configured")
+
+    item.last_tested_at = utc_now()
+    item.status = "TEST_DELIVERY_SIMULATED"
+    db.commit()
+    return {
+        "company_id": company_id,
+        "destination_type": item.destination_type,
+        "target": item.target,
+        "status": item.status,
+        "tested_at": item.last_tested_at.isoformat() if item.last_tested_at else None,
+        "delivery_mode": "STUB",
+    }
+
+
+@app.get("/companies/{company_id}/secret-provider")
+def get_secret_provider(company_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+    return _secret_provider_to_dict(db.get(SecretProviderConfig, company_id), company_id)
+
+
+@app.put("/companies/{company_id}/secret-provider")
+def save_secret_provider(company_id: str, payload: dict, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_action(request, "policy_configure")
+    require_company_access(request, company_id)
+
+    provider = str(payload.get("provider", "ENV")).strip().upper()
+    reference_name = str(payload.get("reference_name", "")).strip()
+    enabled = bool(payload.get("enabled", False))
+
+    if provider not in ALLOWED_SECRET_PROVIDERS:
+        raise HTTPException(status_code=422, detail="provider is not supported")
+    if enabled and not reference_name:
+        raise HTTPException(status_code=422, detail="reference_name is required when secret support is enabled")
+
+    item = db.get(SecretProviderConfig, company_id)
+    if item is None:
+        item = SecretProviderConfig(
+            company_id=company_id,
+            provider=provider,
+            reference_name=reference_name,
+            enabled=1 if enabled else 0,
+            status="CONFIGURED" if enabled else "DISABLED",
+            updated_at=utc_now(),
+        )
+        db.add(item)
+    else:
+        item.provider = provider
+        item.reference_name = reference_name
+        item.enabled = 1 if enabled else 0
+        item.status = "CONFIGURED" if enabled else "DISABLED"
+        item.updated_at = utc_now()
+
+    db.commit()
+    return _secret_provider_to_dict(item, company_id)
 
 
 @app.get("/companies/{company_id}/payroll-export")

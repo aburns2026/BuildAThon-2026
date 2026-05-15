@@ -1,14 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
+
+import { resetDemoState } from "./support";
 
 const runId = process.env.PW_RUN_ID ?? new Date().toISOString().replace(/[:.]/g, "-");
 const archiveDir = path.resolve(__dirname, "../../../../artifacts/playwright-runs", runId);
-const authHeader = {
-  Authorization: `Bearer ${process.env.PW_DEMO_AUTH_TOKEN ?? "demo-employee-token"}`,
-};
-
 async function saveStepScreenshot(page: Page, testInfo: TestInfo, fileName: string) {
   const testOutputPath = testInfo.outputPath(fileName);
   await page.screenshot({ path: testOutputPath, fullPage: true });
@@ -18,17 +16,11 @@ async function saveStepScreenshot(page: Page, testInfo: TestInfo, fileName: stri
   fs.copyFileSync(testOutputPath, archivePath);
 }
 
-async function ensureNoOpenShift(request: APIRequestContext) {
-  const response = await request.post("http://127.0.0.1:8000/employees/E001/clock-out", {
-    headers: authHeader,
-  });
-  if (![200, 409].includes(response.status())) {
-    throw new Error(`Unexpected preflight clock-out status: ${response.status()}`);
-  }
-}
+test.beforeEach(async ({ request }) => {
+  await resetDemoState(request);
+});
 
-test("Mobile accessibility baseline: responsive controls and status semantics", async ({ page, request }, testInfo) => {
-  await ensureNoOpenShift(request);
+test("Mobile accessibility baseline: responsive controls and status semantics", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 

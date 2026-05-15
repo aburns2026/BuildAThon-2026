@@ -1,6 +1,6 @@
 # Product Roadmap (Requirements-Aligned)
 
-Date: 2026-05-14
+Date: 2026-05-15
 
 ## Phase 0 (Completed): MVP Foundation
 - Time capture core: clock-in/out, shift history, audit events, payroll summary
@@ -80,8 +80,10 @@ Date: 2026-05-14
 - [x] Add API metrics and a PostgreSQL-backed compose configuration
 - [x] Expand into scheduling UI
 - [x] Move policy configuration to durable storage and add external alerting/monitoring
-- [ ] Expand into enterprise-admin UI and broader reporting views
+- [x] Re-verify traceability, acceptance criteria, and roadmap claims against code, tests, and current markdown artifacts
+- [x] Expand into enterprise-admin UI and broader reporting views
 - [ ] Add downstream notification integrations and stronger secret-management support
+- [x] Add negative-path Playwright coverage and a frontend unit-test baseline
 
 ## Execution Log
 1. Implemented break/core-hour enforcement metadata in scheduled shifts.
@@ -114,10 +116,17 @@ Date: 2026-05-14
 28. Added a manager-visible scheduling workflow to the frontend and Playwright coverage for it.
 29. Added Prometheus, Alertmanager, and Grafana configuration for external dashboarding and alert evaluation.
 30. Verification: full API suite 37 passed, full Playwright suite 7 passed, backend coverage 90%, compose and monitoring configs validated.
+31. Re-reviewed the repository against source requirements, code, tests, and markdown artifacts; refreshed stale acceptance criteria and tightened traceability language for technical gaps and mobile evidence.
+32. Verification: full API suite 37 passed, Playwright inventory confirmed at 7 defined tests, documentation reconciled.
+33. Added isolated Playwright backend resets, rewrote brittle E2E assertions, added negative-path browser coverage, direct repository logic tests, and a gated compose smoke test.
+34. Expanded the React UI with enterprise admin directory/location views plus operational, crosscheck, and payroll export summaries, and added a frontend unit-test baseline.
+35. Verification: full API suite 42 passed, full Playwright suite 12 passed, frontend unit suite 3 passed, backend coverage 90%, gated compose smoke test passed.
+36. Deepened the admin UI with simple editable policy and location workflows, plus stubbed notification and secret-provider configuration surfaces.
+37. Verification: full API suite 43 passed, full Playwright suite 12 passed, frontend unit suite 3 passed.
 
 ## Implementation Order (Next)
-1. Expand the frontend for enterprise-admin and broader reporting workflows.
-2. Add downstream alert receivers and stronger secret-management support.
+1. Replace the notification and secret-provider stubs with real downstream integrations when infrastructure exists.
+2. Broaden admin management beyond single-record edits into fuller company/location operations.
 3. Add future integration posture for event-driven readiness if that becomes a target.
 
 ## Definition Of Done For This Phase

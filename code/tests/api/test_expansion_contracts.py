@@ -42,6 +42,13 @@ def test_create_approve_leave_and_balance() -> None:
     assert approved.status_code == 200
     assert approved.json()["status"] == "APPROVED"
 
+    duplicate_approval = client.post(
+        f"/leave-requests/{leave_id}/approve",
+        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
+    )
+    assert duplicate_approval.status_code == 409
+    assert duplicate_approval.json()["detail"] == "Leave request already approved"
+
     balance = client.get("/employees/E001/leave-balance", headers=auth_headers())
     assert balance.status_code == 200
     assert balance.json()["used_days"] == 1

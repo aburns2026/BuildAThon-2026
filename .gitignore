@@ -33,6 +33,13 @@ code/.coverage
 code/pytest_output.txt
 artifacts/playwright-runs/
 code/code/
+code/backend/code/
 code/tests/api/coverage.xml
+code/backend/playwright-*.db
+code/backend/playwright-playwright.db
+code/tests/e2e/test_output.txt
+gate_output.txt
+gate_status.txt
+pre_demo_gate_output.txt
 link-check-results.txt
 **/buildathon.db
