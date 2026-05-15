@@ -24,8 +24,15 @@ test("Enterprise admin and reporting views surface company, report, and export d
   await expect(adminCard.getByText("Company Directory")).toBeVisible();
   await expect(adminCard.locator("li").first()).toContainText("E001");
   await expect(adminCard.locator("li").first()).toContainText("LOC-001");
+  await expect(adminCard.locator("li").nth(1)).toContainText("E002");
+  await expect(adminCard.locator("li").nth(1)).toContainText("LOC-002");
   await expect(adminCard.getByText("Location Coverage")).toBeVisible();
-  await expect(adminCard.getByText("Assigned employees")).toBeVisible();
+  const locationCoverageCard = adminCard.getByLabel("Company location overview");
+  await expect(locationCoverageCard.locator("li").nth(0).getByText("Assigned employees")).toBeVisible();
+  await expect(locationCoverageCard.locator("li").nth(0)).toContainText("LOC-001");
+  await expect(locationCoverageCard.locator("li").nth(0)).toContainText("1");
+  await expect(locationCoverageCard.locator("li").nth(1)).toContainText("LOC-002");
+  await expect(locationCoverageCard.locator("li").nth(1)).toContainText("1");
 
   await expect(reportingCard.getByRole("heading", { name: "Operational Reporting" })).toBeVisible();
   await expect(reportingCard.getByText("Operational Summary")).toBeVisible();
@@ -34,7 +41,7 @@ test("Enterprise admin and reporting views surface company, report, and export d
   await expect(reportingCard.getByText("MATCH")).toBeVisible();
   await expect(reportingCard.getByText("Payroll Export Readiness")).toBeVisible();
   await expect(payrollExportCard.locator("dd").nth(0)).toHaveText("READY");
-  await expect(payrollExportCard.locator("dd").nth(1)).toHaveText("1");
+  await expect(payrollExportCard.locator("dd").nth(1)).toHaveText("2");
   await expect(reportingCard.getByText("Location Payroll Export")).toBeVisible();
   await expect(locationPayrollExportCard.locator("dd").nth(0)).toHaveText("READY");
   await expect(locationPayrollExportCard.locator("dd").nth(1)).toHaveText("LOC-001");
@@ -53,6 +60,10 @@ test("Enterprise admin and reporting views surface company, report, and export d
   await expect(adminCard.locator("li").first()).toContainText("LOC-002");
   await expect(locationPayrollExportCard.getByLabel("Location")).toHaveValue("LOC-002");
   await expect(locationPayrollExportCard.locator("dd").nth(1)).toHaveText("LOC-002");
+  await expect(locationPayrollExportCard.locator("dd").nth(2)).toHaveText("2");
+  await expect(locationCoverageCard.locator("li")).toHaveCount(1);
+  await expect(locationCoverageCard.locator("li").first()).toContainText("LOC-002");
+  await expect(locationCoverageCard.locator("li").first()).toContainText("2");
 
   await notificationCard.getByLabel("Target").fill("https://example.invalid/buildathon-webhook");
   await notificationCard.getByLabel("Secret reference").fill("ops/buildathon/webhook-token");

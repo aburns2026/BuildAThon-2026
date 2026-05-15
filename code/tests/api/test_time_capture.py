@@ -81,8 +81,20 @@ def test_get_audit_events_returns_punch_event_history() -> None:
     assert "CLOCK_OUT_ACCEPTED" in event_types
 
 
-def test_get_payroll_summary_returns_closed_shift_totals() -> None:
+def test_get_payroll_summary_returns_closed_shift_totals(monkeypatch) -> None:
+    first_start = datetime(2026, 5, 14, 9, 0, tzinfo=UTC)
+    first_end = first_start + timedelta(minutes=120)
+    second_start = datetime(2026, 5, 16, 9, 0, tzinfo=UTC)
+    second_end = second_start + timedelta(minutes=60)
+
+    monkeypatch.setattr(main, "utc_now", lambda: first_start)
     assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    monkeypatch.setattr(main, "utc_now", lambda: first_end)
+    assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
+
+    monkeypatch.setattr(main, "utc_now", lambda: second_start)
+    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    monkeypatch.setattr(main, "utc_now", lambda: second_end)
     assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
 
     response = client.get(
@@ -95,8 +107,7 @@ def test_get_payroll_summary_returns_closed_shift_totals() -> None:
     body = response.json()
     assert body["employee_id"] == "E001"
     assert body["closed_shift_count"] == 1
-    assert isinstance(body["total_minutes_worked"], int)
-    assert body["total_minutes_worked"] >= 0
+    assert body["total_minutes_worked"] == 120
     assert body["period_start"] == "2026-05-14"
     assert body["period_end"] == "2026-05-14"
 

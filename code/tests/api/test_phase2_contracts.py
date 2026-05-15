@@ -16,14 +16,14 @@ def auth_headers(token: str = "demo-employee-token", extra: dict[str, str] | Non
     return headers
 
 
-def _create_closed_shift_at(monkeypatch, start_at: datetime, duration_minutes: int) -> None:
+def _create_closed_shift_at(monkeypatch, start_at: datetime, duration_minutes: int, employee_id: str = "E001") -> None:
     ended_at = start_at + timedelta(minutes=duration_minutes)
 
     monkeypatch.setattr(main, "utc_now", lambda: start_at)
-    assert client.post("/employees/E001/clock-in", headers=auth_headers()).status_code == 200
+    assert client.post(f"/employees/{employee_id}/clock-in", headers=auth_headers()).status_code == 200
 
     monkeypatch.setattr(main, "utc_now", lambda: ended_at)
-    assert client.post("/employees/E001/clock-out", headers=auth_headers()).status_code == 200
+    assert client.post(f"/employees/{employee_id}/clock-out", headers=auth_headers()).status_code == 200
 
 
 def _create_closed_shift(monkeypatch, duration_minutes: int = 600, start_hour_utc: int = 9) -> None:
@@ -146,8 +146,9 @@ def test_balance_adjustments_validate_non_zero_values_and_reason() -> None:
 
 
 def test_payroll_export_and_integration_payload(monkeypatch) -> None:
-    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 9, 0, tzinfo=UTC), 600)
-    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 16, 23, 0, tzinfo=UTC), 120)
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 9, 0, tzinfo=UTC), 600, employee_id="E001")
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 16, 23, 0, tzinfo=UTC), 120, employee_id="E001")
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 8, 0, tzinfo=UTC), 480, employee_id="E002")
 
     forbidden = client.get("/companies/COMP-001/payroll-export")
     assert forbidden.status_code == 401
@@ -163,7 +164,7 @@ def test_payroll_export_and_integration_payload(monkeypatch) -> None:
     assert export_body["status"] == "READY"
     assert export_body["period_start"] == "2026-01-01"
     assert export_body["period_end"] == "2026-12-31"
-    assert export_body["row_count"] == 1
+    assert export_body["row_count"] == 2
     assert export_body["rows"] == [
         {
             "employee_id": "E001",
@@ -172,7 +173,40 @@ def test_payroll_export_and_integration_payload(monkeypatch) -> None:
             "overtime_minutes": 120,
             "holiday_minutes": 120,
             "night_shift_minutes": 120,
+        },
+        {
+            "employee_id": "E002",
+            "location_id": "LOC-002",
+            "total_minutes_worked": 480,
+            "overtime_minutes": 0,
+            "holiday_minutes": 0,
+            "night_shift_minutes": 0,
         }
+    ]
+
+    filtered_export = client.get(
+        "/companies/COMP-001/payroll-export",
+        params={"period_start": "2026-05-16", "period_end": "2026-05-16"},
+        headers=auth_headers("demo-payroll-token", {"x-role": "PAYROLL", "x-company-id": "COMP-001"}),
+    )
+    assert filtered_export.status_code == 200
+    assert filtered_export.json()["rows"] == [
+        {
+            "employee_id": "E001",
+            "location_id": "LOC-001",
+            "total_minutes_worked": 120,
+            "overtime_minutes": 0,
+            "holiday_minutes": 120,
+            "night_shift_minutes": 120,
+        },
+        {
+            "employee_id": "E002",
+            "location_id": "LOC-002",
+            "total_minutes_worked": 0,
+            "overtime_minutes": 0,
+            "holiday_minutes": 0,
+            "night_shift_minutes": 0,
+        },
     ]
 
     integration = client.get(
@@ -188,18 +222,34 @@ def test_payroll_export_and_integration_payload(monkeypatch) -> None:
 
 def test_location_scoped_endpoints(monkeypatch) -> None:
     _create_closed_shift(monkeypatch, duration_minutes=120)
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 8, 0, tzinfo=UTC), 480, employee_id="E002")
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 16, 23, 0, tzinfo=UTC), 120, employee_id="E002")
 
     locations = client.get("/companies/COMP-001/locations", headers=auth_headers())
     assert locations.status_code == 200
     assert locations.json()["company_id"] == "COMP-001"
-    assert locations.json()["locations"][0]["location_id"] == "LOC-001"
+    assert locations.json()["locations"] == [
+        {"location_id": "LOC-001", "employee_count": 1},
+        {"location_id": "LOC-002", "employee_count": 1},
+    ]
 
     location_employees = client.get(
         "/companies/COMP-001/locations/LOC-001/employees",
         headers=auth_headers(),
     )
     assert location_employees.status_code == 200
-    assert len(location_employees.json()["employees"]) >= 1
+    assert location_employees.json()["employees"] == [
+        {"employee_id": "E001", "company_id": "COMP-001", "location_id": "LOC-001"}
+    ]
+
+    second_location_employees = client.get(
+        "/companies/COMP-001/locations/LOC-002/employees",
+        headers=auth_headers(),
+    )
+    assert second_location_employees.status_code == 200
+    assert second_location_employees.json()["employees"] == [
+        {"employee_id": "E002", "company_id": "COMP-001", "location_id": "LOC-002"}
+    ]
 
     missing_location = client.get(
         "/companies/COMP-001/locations/LOC-999/employees",
@@ -230,21 +280,61 @@ def test_location_scoped_endpoints(monkeypatch) -> None:
         }
     ]
 
+    second_allowed = client.get(
+        "/companies/COMP-001/locations/LOC-002/payroll-export",
+        headers=auth_headers("demo-payroll-token", {"x-role": "PAYROLL", "x-company-id": "COMP-001"}),
+    )
+    assert second_allowed.status_code == 200
+    second_body = second_allowed.json()
+    assert second_body["location_id"] == "LOC-002"
+    assert second_body["row_count"] == 1
+    assert second_body["rows"] == [
+        {
+            "employee_id": "E002",
+            "location_id": "LOC-002",
+            "total_minutes_worked": 600,
+            "overtime_minutes": 0,
+            "holiday_minutes": 120,
+            "night_shift_minutes": 120,
+        }
+    ]
+
+    second_filtered = client.get(
+        "/companies/COMP-001/locations/LOC-002/payroll-export",
+        params={"period_start": "2026-05-15", "period_end": "2026-05-15"},
+        headers=auth_headers("demo-payroll-token", {"x-role": "PAYROLL", "x-company-id": "COMP-001"}),
+    )
+    assert second_filtered.status_code == 200
+    assert second_filtered.json()["rows"] == [
+        {
+            "employee_id": "E002",
+            "location_id": "LOC-002",
+            "total_minutes_worked": 480,
+            "overtime_minutes": 0,
+            "holiday_minutes": 0,
+            "night_shift_minutes": 0,
+        }
+    ]
+
 
 def test_operational_and_crosscheck_reports(monkeypatch) -> None:
     _create_closed_shift(monkeypatch, duration_minutes=120)
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 8, 0, tzinfo=UTC), 480, employee_id="E002")
+    _create_closed_shift_at(monkeypatch, datetime(2026, 5, 15, 7, 0, tzinfo=UTC), 60, employee_id="E101")
 
     report = client.get(
         "/reports/operational",
-        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER"}),
+        params={"company_id": "COMP-001"},
+        headers=auth_headers("demo-manager-token", {"x-role": "MANAGER", "x-company-id": "COMP-001"}),
     )
     assert report.status_code == 200
     report_body = report.json()
-    assert report_body["event_count"] == 2
-    assert report_body["accepted_event_count"] == 2
+    assert report_body["company_id"] == "COMP-001"
+    assert report_body["event_count"] == 4
+    assert report_body["accepted_event_count"] == 4
     assert report_body["rejected_event_count"] == 0
     assert report_body["open_shift_count"] == 0
-    assert report_body["closed_shift_count"] == 1
+    assert report_body["closed_shift_count"] == 2
 
     crosscheck = client.get(
         "/reports/crosscheck",
@@ -301,7 +391,7 @@ def test_company_admin_workflows_cover_location_notifications_and_secret_stubs()
 
     locations = client.get("/companies/COMP-001/locations", headers=auth_headers())
     assert locations.status_code == 200
-    assert locations.json()["locations"] == [{"location_id": "LOC-002", "employee_count": 1}]
+    assert locations.json()["locations"] == [{"location_id": "LOC-002", "employee_count": 2}]
 
     notification_settings = client.put(
         "/companies/COMP-001/notification-settings",

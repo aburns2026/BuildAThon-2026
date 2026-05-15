@@ -384,6 +384,20 @@ def _get_closed_shift_query(db: Session, employee_id: str):
     )
 
 
+def _approved_leave_day_total(db: Session, employee_id: str) -> int:
+    approved_requests = (
+        db.query(LeaveRequest)
+        .filter(LeaveRequest.employee_id == employee_id, LeaveRequest.status == "APPROVED")
+        .all()
+    )
+    total_days = 0
+    for item in approved_requests:
+        start_date = parse_iso_date(item.start_date, "start_date")
+        end_date = parse_iso_date(item.end_date, "end_date")
+        total_days += (end_date - start_date).days + 1
+    return total_days
+
+
 def _roll_up_validation_status(items: list[dict]) -> str:
     if any(item["status"] == "FAIL" for item in items):
         return "FAIL"
@@ -462,11 +476,22 @@ def _build_compliance_report(db: Session, employee_id: str) -> dict:
     }
 
 
-def _build_company_payroll_rows(db: Session, company_id: str) -> list[dict]:
-    company_employees = db.query(Employee).filter(Employee.company_id == company_id).all()
+def _build_company_payroll_rows(
+    db: Session,
+    company_id: str,
+    *,
+    period_start: date_cls | None = None,
+    period_end: date_cls | None = None,
+) -> list[dict]:
+    company_employees = (
+        db.query(Employee)
+        .filter(Employee.company_id == company_id)
+        .order_by(Employee.employee_id)
+        .all()
+    )
     rows: list[dict] = []
     for employee in company_employees:
-        metrics = payroll_metrics(db, employee.employee_id)
+        metrics = payroll_metrics(db, employee.employee_id, period_start=period_start, period_end=period_end)
         rows.append(
             {
                 "employee_id": employee.employee_id,
@@ -480,15 +505,23 @@ def _build_company_payroll_rows(db: Session, company_id: str) -> list[dict]:
     return rows
 
 
-def _build_location_payroll_rows(db: Session, company_id: str, location_id: str) -> list[dict]:
+def _build_location_payroll_rows(
+    db: Session,
+    company_id: str,
+    location_id: str,
+    *,
+    period_start: date_cls | None = None,
+    period_end: date_cls | None = None,
+) -> list[dict]:
     location_employees = (
         db.query(Employee)
         .filter(Employee.company_id == company_id, Employee.location_id == location_id)
+        .order_by(Employee.employee_id)
         .all()
     )
     rows: list[dict] = []
     for employee in location_employees:
-        metrics = payroll_metrics(db, employee.employee_id)
+        metrics = payroll_metrics(db, employee.employee_id, period_start=period_start, period_end=period_end)
         rows.append(
             {
                 "employee_id": employee.employee_id,
@@ -755,7 +788,12 @@ def get_payroll_summary(
     db: Session = Depends(get_db),
 ) -> dict:
     ensure_employee_exists(db, employee_id)
-    metrics = payroll_metrics(db, employee_id)
+    start_date = parse_optional_iso_date(period_start, "period_start")
+    end_date = parse_optional_iso_date(period_end, "period_end")
+    if start_date and end_date and end_date < start_date:
+        raise HTTPException(status_code=422, detail="period_end must be on or after period_start")
+
+    metrics = payroll_metrics(db, employee_id, period_start=start_date, period_end=end_date)
     return {
         "employee_id": employee_id,
         "total_minutes_worked": metrics["total_minutes"],
@@ -876,12 +914,7 @@ def approve_leave_request(leave_request_id: str, request: Request, db: Session =
 @app.get("/employees/{employee_id}/leave-balance")
 def get_leave_balance(employee_id: str, db: Session = Depends(get_db)) -> dict:
     ensure_employee_exists(db, employee_id)
-    approved_requests = (
-        db.query(LeaveRequest)
-        .filter(LeaveRequest.employee_id == employee_id, LeaveRequest.status == "APPROVED")
-        .all()
-    )
-    used_days = len(approved_requests)
+    used_days = _approved_leave_day_total(db, employee_id)
     total_days = 20
     return {
         "employee_id": employee_id,
@@ -1054,12 +1087,7 @@ def get_pto_balance(employee_id: str, db: Session = Depends(get_db)) -> dict:
     ensure_employee_exists(db, employee_id)
     pto_adjustments = db.query(PtoAdjustment).filter(PtoAdjustment.employee_id == employee_id).all()
     total_days = 20 + sum(item.days_delta for item in pto_adjustments)
-    approved_requests = (
-        db.query(LeaveRequest)
-        .filter(LeaveRequest.employee_id == employee_id, LeaveRequest.status == "APPROVED")
-        .all()
-    )
-    used_days = len(approved_requests)
+    used_days = _approved_leave_day_total(db, employee_id)
     return {
         "employee_id": employee_id,
         "total_days": total_days,
@@ -1140,7 +1168,7 @@ def adjust_comp_time_balance(employee_id: str, payload: dict, request: Request, 
 
 @app.get("/companies/{company_id}/employees")
 def list_company_employees(company_id: str, db: Session = Depends(get_db)) -> dict:
-    employees = db.query(Employee).filter(Employee.company_id == company_id).all()
+    employees = db.query(Employee).filter(Employee.company_id == company_id).order_by(Employee.employee_id).all()
     return {
         "employees": [
             {"employee_id": item.employee_id, "company_id": item.company_id, "location_id": item.location_id}
@@ -1188,6 +1216,7 @@ def list_location_employees(company_id: str, location_id: str, db: Session = Dep
     employees = (
         db.query(Employee)
         .filter(Employee.company_id == company_id, Employee.location_id == location_id)
+        .order_by(Employee.employee_id)
         .all()
     )
     if not employees:
@@ -1322,12 +1351,16 @@ def get_payroll_export(
 ) -> dict:
     require_action(request, "payroll_export")
     require_company_access(request, company_id)
+    start_date = parse_optional_iso_date(period_start, "period_start")
+    end_date = parse_optional_iso_date(period_end, "period_end")
+    if start_date and end_date and end_date < start_date:
+        raise HTTPException(status_code=422, detail="period_end must be on or after period_start")
     if period_start:
         parse_iso_date(period_start, "period_start")
     if period_end:
         parse_iso_date(period_end, "period_end")
 
-    rows = _build_company_payroll_rows(db, company_id)
+    rows = _build_company_payroll_rows(db, company_id, period_start=start_date, period_end=end_date)
     return {
         "export_id": str(uuid4()),
         "company_id": company_id,
@@ -1351,12 +1384,22 @@ def get_location_payroll_export(
 ) -> dict:
     require_action(request, "payroll_export")
     require_company_access(request, company_id)
+    start_date = parse_optional_iso_date(period_start, "period_start")
+    end_date = parse_optional_iso_date(period_end, "period_end")
+    if start_date and end_date and end_date < start_date:
+        raise HTTPException(status_code=422, detail="period_end must be on or after period_start")
     if period_start:
         parse_iso_date(period_start, "period_start")
     if period_end:
         parse_iso_date(period_end, "period_end")
 
-    rows = _build_location_payroll_rows(db, company_id, location_id)
+    rows = _build_location_payroll_rows(
+        db,
+        company_id,
+        location_id,
+        period_start=start_date,
+        period_end=end_date,
+    )
     if not rows:
         raise HTTPException(status_code=404, detail="Location not found for company")
 

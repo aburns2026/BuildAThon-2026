@@ -30,5 +30,6 @@ test("Leave workflow: employee submits request and manager approval updates bala
   await expect(page.locator("p.message")).toContainText("Leave request approved");
   await expect(requestRow).toContainText("APPROVED");
   await expect(requestRow).not.toContainText("Approve Leave Request");
-  await expect(leaveCard.locator(".leave-summary dd").nth(1)).toHaveText("1");
+  await expect(leaveCard.locator(".leave-summary dd").nth(1)).toHaveText("2");
+  await expect(leaveCard.locator(".leave-summary dd").nth(2)).toHaveText("18");
 });

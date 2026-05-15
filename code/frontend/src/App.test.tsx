@@ -109,7 +109,10 @@ function buildBootstrapRoutes(): MockRoute[] {
       "GET",
       "/companies/COMP-001/employees",
       jsonResponse({
-        employees: [{ employee_id: "E001", company_id: "COMP-001", location_id: "LOC-001" }],
+        employees: [
+          { employee_id: "E001", company_id: "COMP-001", location_id: "LOC-001" },
+          { employee_id: "E002", company_id: "COMP-001", location_id: "LOC-002" },
+        ],
       })
     ),
     route(
@@ -117,7 +120,10 @@ function buildBootstrapRoutes(): MockRoute[] {
       "/companies/COMP-001/locations",
       jsonResponse({
         company_id: "COMP-001",
-        locations: [{ location_id: "LOC-001", employee_count: 1 }],
+        locations: [
+          { location_id: "LOC-001", employee_count: 1 },
+          { location_id: "LOC-002", employee_count: 1 },
+        ],
       })
     ),
     route(
@@ -254,9 +260,11 @@ describe("App", () => {
     });
 
     const locationExportCard = screen.getByLabelText("Location payroll export status");
+    const companyDirectory = screen.getByLabelText("Company employee directory");
     expect(screen.getByText("No shifts yet.")).toBeVisible();
     expect(within(locationExportCard).getByDisplayValue("LOC-001")).toBeVisible();
     expect(within(locationExportCard).getByText("READY")).toBeVisible();
+    expect(within(companyDirectory).getByText("E002")).toBeVisible();
   });
 
   it("surfaces backend error details for failed punch attempts", async () => {
@@ -423,5 +431,115 @@ describe("App", () => {
     expect(capturedCompBody).toEqual({ minutes_delta: 30, reason: "Manual correction" });
     expect(within(ptoCard).getAllByText("22")).toHaveLength(2);
     expect(within(compTimeCard).getByText("90 min")).toBeVisible();
+  });
+
+  it("preserves last-good payroll integration data through a partial refresh failure and replaces it on the next successful refresh", async () => {
+    let ptoBalance = { employee_id: "E001", total_days: 20, used_days: 0, remaining_days: 20 };
+    let payloadRequestCount = 0;
+
+    installApiMock([
+      ...buildBootstrapRoutes(),
+      route(
+        "GET",
+        "/employees/E001/pto-balance",
+        () => jsonResponse(ptoBalance)
+      ),
+      route(
+        "POST",
+        "/employees/E001/pto-adjustments",
+        (_input, init) => {
+          const body = parseJsonBody(init);
+          const daysDelta = Number(body.days_delta ?? 0);
+          ptoBalance = {
+            ...ptoBalance,
+            total_days: ptoBalance.total_days + daysDelta,
+            remaining_days: ptoBalance.remaining_days + daysDelta,
+          };
+          return jsonResponse({ days_delta: daysDelta });
+        }
+      ),
+      route(
+        "GET",
+        "/companies/COMP-001/payroll-integration-payload",
+        () => {
+          payloadRequestCount += 1;
+          if (payloadRequestCount === 2) {
+            return jsonResponse({ detail: "Synthetic payload failure" }, false, 500);
+          }
+          if (payloadRequestCount >= 3) {
+            return jsonResponse({
+              company_id: "COMP-001",
+              generated_at: "2026-05-15T12:10:00+00:00",
+              schema_version: "1.0",
+              destination: "future-payroll-integration",
+              employees: [
+                {
+                  employee_id: "E001",
+                  location_id: "LOC-001",
+                  total_minutes_worked: 120,
+                  overtime_minutes: 0,
+                  holiday_minutes: 0,
+                  night_shift_minutes: 0,
+                },
+                {
+                  employee_id: "E002",
+                  location_id: "LOC-002",
+                  total_minutes_worked: 480,
+                  overtime_minutes: 0,
+                  holiday_minutes: 0,
+                  night_shift_minutes: 0,
+                },
+              ],
+            });
+          }
+          return jsonResponse({
+            company_id: "COMP-001",
+            generated_at: "2026-05-15T12:00:00+00:00",
+            schema_version: "1.0",
+            destination: "future-payroll-integration",
+            employees: [
+              {
+                employee_id: "E001",
+                location_id: "LOC-001",
+                total_minutes_worked: 120,
+                overtime_minutes: 0,
+                holiday_minutes: 0,
+                night_shift_minutes: 0,
+              },
+            ],
+          });
+        }
+      ),
+    ]);
+
+    const user = userEvent.setup();
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Payroll integration payload")).toBeVisible();
+    });
+
+    const payloadCard = screen.getByLabelText("Payroll integration payload");
+    const ptoCard = screen.getByLabelText("PTO balance and adjustments");
+
+    expect(within(payloadCard).getByText("E001")).toBeVisible();
+
+    await user.clear(within(ptoCard).getByLabelText("PTO adjustment days"));
+    await user.type(within(ptoCard).getByLabelText("PTO adjustment days"), "2");
+    await user.click(within(ptoCard).getByRole("button", { name: "Adjust PTO Balance" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("PTO adjusted by 2 day(s)")).toBeVisible();
+    });
+    expect(within(payloadCard).getByText("E001")).toBeVisible();
+    expect(within(payloadCard).queryByText("E002")).toBeNull();
+
+    await user.clear(within(ptoCard).getByLabelText("PTO adjustment days"));
+    await user.type(within(ptoCard).getByLabelText("PTO adjustment days"), "1");
+    await user.click(within(ptoCard).getByRole("button", { name: "Adjust PTO Balance" }));
+
+    await waitFor(() => {
+      expect(within(payloadCard).getByText("E002")).toBeVisible();
+    });
   });
 });

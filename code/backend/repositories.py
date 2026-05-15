@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 from sqlalchemy import desc
@@ -97,8 +97,19 @@ def add_audit_event(db: Session, employee_id: str, event_type: str, details: str
 
 
 def ensure_seed_employee(db: Session) -> None:
-    if db.get(Employee, "E001") is None:
-        db.add(Employee(employee_id="E001", company_id="COMP-001", location_id="LOC-001"))
+    seed_employees = [
+        Employee(employee_id="E001", company_id="COMP-001", location_id="LOC-001"),
+        Employee(employee_id="E002", company_id="COMP-001", location_id="LOC-002"),
+        Employee(employee_id="E101", company_id="COMP-002", location_id="LOC-101"),
+    ]
+
+    created = False
+    for employee in seed_employees:
+        if db.get(Employee, employee.employee_id) is None:
+            db.add(employee)
+            created = True
+
+    if created:
         db.commit()
 
 
@@ -111,13 +122,19 @@ def get_open_shift(db: Session, employee_id: str) -> Shift | None:
     )
 
 
-def list_closed_shifts(db: Session, employee_id: str) -> list[Shift]:
-    return (
-        db.query(Shift)
-        .filter(Shift.employee_id == employee_id, Shift.state == "CLOSED")
-        .order_by(Shift.start_at)
-        .all()
-    )
+def list_closed_shifts(
+    db: Session,
+    employee_id: str,
+    *,
+    period_start: date | None = None,
+    period_end: date | None = None,
+) -> list[Shift]:
+    query = db.query(Shift).filter(Shift.employee_id == employee_id, Shift.state == "CLOSED")
+    if period_start is not None:
+        query = query.filter(Shift.start_at >= datetime.combine(period_start, datetime.min.time(), tzinfo=UTC))
+    if period_end is not None:
+        query = query.filter(Shift.start_at < datetime.combine(period_end + timedelta(days=1), datetime.min.time(), tzinfo=UTC))
+    return query.order_by(Shift.start_at).all()
 
 
 def compute_night_minutes(start_at: datetime, end_at: datetime | None) -> int:
@@ -136,8 +153,14 @@ def is_holiday_shift(start_at: datetime) -> bool:
     return start_at.date().weekday() >= 5
 
 
-def payroll_metrics(db: Session, employee_id: str) -> dict:
-    closed = list_closed_shifts(db, employee_id)
+def payroll_metrics(
+    db: Session,
+    employee_id: str,
+    *,
+    period_start: date | None = None,
+    period_end: date | None = None,
+) -> dict:
+    closed = list_closed_shifts(db, employee_id, period_start=period_start, period_end=period_end)
     total_minutes = sum(int(shift.duration_minutes or 0) for shift in closed)
     overtime_minutes = sum(max(0, int(shift.duration_minutes or 0) - 480) for shift in closed)
     holiday_minutes = sum(int(shift.duration_minutes or 0) for shift in closed if is_holiday_shift(shift.start_at))
